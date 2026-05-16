@@ -9,10 +9,16 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as RewardsRouteImport } from './routes/rewards'
 import { Route as LevelsRouteImport } from './routes/levels'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PlayLevelRouteImport } from './routes/play.$level'
 
+const RewardsRoute = RewardsRouteImport.update({
+  id: '/rewards',
+  path: '/rewards',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LevelsRoute = LevelsRouteImport.update({
   id: '/levels',
   path: '/levels',
@@ -32,35 +38,46 @@ const PlayLevelRoute = PlayLevelRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/levels': typeof LevelsRoute
+  '/rewards': typeof RewardsRoute
   '/play/$level': typeof PlayLevelRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/levels': typeof LevelsRoute
+  '/rewards': typeof RewardsRoute
   '/play/$level': typeof PlayLevelRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/levels': typeof LevelsRoute
+  '/rewards': typeof RewardsRoute
   '/play/$level': typeof PlayLevelRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/levels' | '/play/$level'
+  fullPaths: '/' | '/levels' | '/rewards' | '/play/$level'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/levels' | '/play/$level'
-  id: '__root__' | '/' | '/levels' | '/play/$level'
+  to: '/' | '/levels' | '/rewards' | '/play/$level'
+  id: '__root__' | '/' | '/levels' | '/rewards' | '/play/$level'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LevelsRoute: typeof LevelsRoute
+  RewardsRoute: typeof RewardsRoute
   PlayLevelRoute: typeof PlayLevelRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/rewards': {
+      id: '/rewards'
+      path: '/rewards'
+      fullPath: '/rewards'
+      preLoaderRoute: typeof RewardsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/levels': {
       id: '/levels'
       path: '/levels'
@@ -88,6 +105,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LevelsRoute: LevelsRoute,
+  RewardsRoute: RewardsRoute,
   PlayLevelRoute: PlayLevelRoute,
 }
 export const routeTree = rootRouteImport
