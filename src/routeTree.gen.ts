@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LevelsRouteImport } from './routes/levels'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PlayLevelRouteImport } from './routes/play.$level'
 
 const LevelsRoute = LevelsRouteImport.update({
   id: '/levels',
@@ -22,31 +23,40 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PlayLevelRoute = PlayLevelRouteImport.update({
+  id: '/play/$level',
+  path: '/play/$level',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/levels': typeof LevelsRoute
+  '/play/$level': typeof PlayLevelRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/levels': typeof LevelsRoute
+  '/play/$level': typeof PlayLevelRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/levels': typeof LevelsRoute
+  '/play/$level': typeof PlayLevelRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/levels'
+  fullPaths: '/' | '/levels' | '/play/$level'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/levels'
-  id: '__root__' | '/' | '/levels'
+  to: '/' | '/levels' | '/play/$level'
+  id: '__root__' | '/' | '/levels' | '/play/$level'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LevelsRoute: typeof LevelsRoute
+  PlayLevelRoute: typeof PlayLevelRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -65,12 +75,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/play/$level': {
+      id: '/play/$level'
+      path: '/play/$level'
+      fullPath: '/play/$level'
+      preLoaderRoute: typeof PlayLevelRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LevelsRoute: LevelsRoute,
+  PlayLevelRoute: PlayLevelRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
