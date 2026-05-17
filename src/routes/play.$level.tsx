@@ -285,19 +285,19 @@ function Card({ card, onClick }: { card: CardState; onClick: () => void }) {
     <button
       onClick={onClick}
       disabled={card.matched}
-      className="relative aspect-square w-full"
+      className="relative aspect-square w-full rounded-2xl"
       style={{ perspective: "800px" }}
       aria-label={showFront ? card.emoji : "hidden card"}
     >
       <div
-        className={`absolute inset-0 card-3d ${showFront ? "flipped" : ""} ${card.matched ? "matched-glow" : ""} ${card.mismatch ? "mismatch-flash" : ""}`}
+        className={`absolute inset-0 card-3d rounded-2xl ${showFront ? "flipped" : ""} ${card.matched ? "matched-glow" : ""} ${card.mismatch ? "mismatch-flash" : ""}`}
       >
-        <div className="card-face absolute inset-0 rounded-2xl flex items-center justify-center text-4xl sm:text-5xl"
-          style={{ background: "linear-gradient(135deg, oklch(0.3 0.12 290), oklch(0.2 0.1 240))", border: "1px solid oklch(1 0 0 / 0.1)", boxShadow: "inset 0 0 20px oklch(0 0 0 / 0.4)" }}>
+        <div className="card-face absolute inset-0 rounded-2xl overflow-hidden flex items-center justify-center text-4xl sm:text-5xl"
+          style={{ background: "linear-gradient(135deg, oklch(0.55 0.18 290), oklch(0.45 0.18 240))", border: "1px solid oklch(1 0 0 / 0.18)" }}>
           <span className="text-glow text-2xl">✦</span>
         </div>
-        <div className="card-face card-back absolute inset-0 rounded-2xl flex items-center justify-center text-4xl sm:text-5xl"
-          style={{ background: "linear-gradient(135deg, oklch(0.95 0.05 90), oklch(0.85 0.1 320))", color: "oklch(0.15 0 0)" }}>
+        <div className="card-face card-back absolute inset-0 rounded-2xl overflow-hidden flex items-center justify-center text-4xl sm:text-5xl"
+          style={{ background: "linear-gradient(135deg, oklch(0.97 0.04 90), oklch(0.92 0.08 320))", color: "oklch(0.15 0 0)", border: "1px solid oklch(1 0 0 / 0.3)" }}>
           <span>{card.emoji}</span>
         </div>
       </div>

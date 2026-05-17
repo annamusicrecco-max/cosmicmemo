@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Universe } from "@/components/Universe";
 import { loadState, type GameState } from "@/lib/game-state";
+import logo from "@/assets/logo.png";
 
 export const Route = createFileRoute("/")({
   component: Welcome,
@@ -23,6 +24,13 @@ function Welcome() {
       <div className="absolute inset-0 nebula-drift opacity-60 -z-10 pointer-events-none"
         style={{ background: "radial-gradient(circle at 30% 40%, oklch(0.5 0.25 320 / 0.4), transparent 50%), radial-gradient(circle at 70% 60%, oklch(0.5 0.25 200 / 0.35), transparent 55%)" }} />
 
+      <img
+        src={logo}
+        alt="Cosmic Memory logo"
+        width={128}
+        height={128}
+        className="w-28 h-28 sm:w-32 sm:h-32 mb-4 drop-shadow-[0_0_30px_oklch(0.72_0.22_320_/_0.6)] pop-in"
+      />
       <h1 className="text-5xl sm:text-7xl md:text-8xl font-black tracking-tight text-glow pop-in leading-[1.05]">
         Cosmic <span style={{ background: "linear-gradient(135deg,var(--primary),var(--accent))", WebkitBackgroundClip: "text", color: "transparent" }}>Memory</span>
       </h1>
