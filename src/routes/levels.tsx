@@ -40,7 +40,7 @@ function LevelsPage() {
 
   const launch = (lvl: number, unlocked: boolean) => {
     if (drag.current.moved > 6) return; // was a drag
-    if (!unlocked) { vibrate(50); return; }
+    if (!unlocked) return;
     
     navigate({ to: "/play/$level", params: { level: String(lvl) } });
   };
