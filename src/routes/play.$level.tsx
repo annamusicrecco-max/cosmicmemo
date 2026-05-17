@@ -80,7 +80,7 @@ function Play() {
     s.streak = 0;
     saveState(s);
     setStreak(0);
-    vibrate([60, 40, 60]);
+    
     beep("miss");
   };
 
@@ -89,7 +89,7 @@ function Play() {
     const c = deck[idx];
     if (!c || c.flipped || c.matched) return;
     if (selected.length >= 2) return;
-    vibrate(10); beep("click");
+    beep("click");
     if (!started) setStarted(true);
 
     const next = deck.slice();
@@ -111,7 +111,7 @@ function Play() {
             nd[b] = { ...nd[b], matched: true };
             return nd;
           });
-          beep("match"); vibrate(20);
+          beep("match");
           setSelected([]);
           // win check
           setTimeout(() => checkWin(), 50);
@@ -160,7 +160,7 @@ function Play() {
   const winLevel = () => {
     setWon(true);
     if (intervalRef.current) clearInterval(intervalRef.current);
-    beep("win"); vibrate([30, 20, 80]);
+    beep("win");
     const s = loadState();
     if (!s.completed.includes(level)) s.completed.push(level);
     s.streak += 1;
@@ -182,7 +182,7 @@ function Play() {
     try {
       if (reward.code) navigator.clipboard?.writeText(reward.code);
     } catch { /* ignore */ }
-    vibrate(30);
+    
     alert(`Reward claimed! ${reward.code ? `Code "${reward.code}" copied to clipboard. ` : ""}In production, this would be a real code or link.`);
   };
 
@@ -204,7 +204,7 @@ function Play() {
       <Confetti active={won} />
 
       <header className="flex items-center justify-between gap-3 px-4 py-3 flex-wrap">
-        <Link to="/levels" onClick={() => vibrate(10)} className="glass rounded-full px-4 py-2 text-sm hover:scale-105 transition">← Map</Link>
+        <Link to="/levels" className="glass rounded-full px-4 py-2 text-sm hover:scale-105 transition">← Map</Link>
         <div className="flex gap-3 items-center text-sm">
           <Badge>🎯 L{level}</Badge>
           <Badge>⏱ {cfg.timeLimit ? minSec(timeLeft) : minSec(elapsed)}</Badge>
@@ -237,7 +237,7 @@ function Play() {
           <h2 className="text-2xl font-black mb-2">Level Failed</h2>
           <p className="text-muted-foreground mb-6">Your streak was reset. Give it another shot!</p>
           <div className="flex gap-3 justify-center">
-            <button className="btn-cosmic" onClick={() => { vibrate(10); resetBoard(); }}>Try Again</button>
+            <button className="btn-cosmic" onClick={() => { resetBoard(); }}>Try Again</button>
             <Link to="/levels" className="glass rounded-full px-5 py-3">Back to Map</Link>
           </div>
         </Modal>
@@ -258,7 +258,7 @@ function Play() {
           </div>
 
           <div className="flex gap-3 mt-5 justify-center">
-            <button className="btn-cosmic" onClick={() => { vibrate(10); next(); }}>Next Level →</button>
+            <button className="btn-cosmic" onClick={() => { next(); }}>Next Level →</button>
             <Link to="/levels" className="glass rounded-full px-5 py-3">Back to Map</Link>
           </div>
         </Modal>
