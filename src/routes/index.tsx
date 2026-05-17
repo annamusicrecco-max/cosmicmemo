@@ -40,7 +40,7 @@ function Welcome() {
 
       <Link
         to="/levels"
-        onClick={() => vibrate(10)}
+        
         className="btn-cosmic mt-10 text-lg"
       >
         🚀 Start Journey
