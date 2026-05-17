@@ -16,7 +16,11 @@ export function Universe({ parallax = 1 }: { parallax?: number }) {
     const resize = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
-      stars = Array.from({ length: 180 }, () => ({
+      const area = canvas.width * canvas.height;
+      const isCoarse = window.matchMedia?.("(pointer: coarse)").matches;
+      const base = isCoarse ? 60 : 180;
+      const count = Math.min(base, Math.round(area / 12000));
+      stars = Array.from({ length: count }, () => ({
         x: Math.random() * canvas.width,
         y: Math.random() * canvas.height,
         r: Math.random() * 1.6 + 0.3,

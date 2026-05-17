@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { Universe } from "@/components/Universe";
-import { loadState, vibrate, type GameState } from "@/lib/game-state";
+import { loadState, type GameState } from "@/lib/game-state";
 
 export const Route = createFileRoute("/levels")({
   component: LevelsPage,
@@ -40,8 +40,8 @@ function LevelsPage() {
 
   const launch = (lvl: number, unlocked: boolean) => {
     if (drag.current.moved > 6) return; // was a drag
-    if (!unlocked) { vibrate(50); return; }
-    vibrate(10);
+    if (!unlocked) return;
+    
     navigate({ to: "/play/$level", params: { level: String(lvl) } });
   };
 
@@ -49,10 +49,10 @@ function LevelsPage() {
     <main className="relative min-h-screen flex flex-col overflow-hidden">
       <Universe parallax={0.4} />
 
-      <header className="flex items-center justify-between px-6 py-4">
-        <Link to="/" className="glass rounded-full px-4 py-2 text-sm hover:scale-105 transition">← Home</Link>
-        <h1 className="text-2xl font-black text-glow">Choose a Level</h1>
-        <Link to="/rewards" className="glass rounded-full px-4 py-2 text-sm hover:scale-105 transition">🎁 Rewards</Link>
+      <header className="flex items-center justify-between gap-2 px-3 sm:px-6 py-3 sm:py-4 flex-wrap">
+        <Link to="/" className="glass rounded-full px-3 py-2 text-xs sm:text-sm hover:scale-105 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent">← Home</Link>
+        <h1 className="order-last sm:order-none basis-full sm:basis-auto text-center text-lg sm:text-2xl font-black text-glow">Choose a Level</h1>
+        <Link to="/rewards" className="glass rounded-full px-3 py-2 text-xs sm:text-sm hover:scale-105 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent">🎁 Rewards</Link>
       </header>
 
       <div className="flex-1 flex items-center">
@@ -73,7 +73,7 @@ function LevelsPage() {
                 <button
                   key={lvl}
                   onClick={() => launch(lvl, unlocked)}
-                  className={`shrink-0 w-28 h-36 rounded-2xl glass relative flex flex-col items-center justify-center transition-transform hover:scale-110 ${unlocked ? "" : "level-locked"}`}
+                  className={`shrink-0 w-24 h-32 sm:w-28 sm:h-36 rounded-2xl glass relative flex flex-col items-center justify-center transition-transform hover:scale-110 focus:outline-none focus-visible:ring-4 focus-visible:ring-accent ${unlocked ? "" : "level-locked"}`}
                   style={unlocked ? { boxShadow: "0 0 30px oklch(0.72 0.22 320 / 0.45)", border: "1px solid oklch(0.78 0.2 195 / 0.4)" } : {}}
                   aria-label={`Level ${lvl} ${unlocked ? "unlocked" : "locked"}`}
                 >
