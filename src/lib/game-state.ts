@@ -9,21 +9,16 @@ export type LevelConfig = {
   emojiSet: string[];
 };
 
-const EMOJI_TIERS: string[][] = [
-  ["🌞", "🐱", "🐶", "⭐", "🌈", "🍕", "🎈", "🚀", "🍩", "🦄", "🐼", "🌸", "🍉", "🐸", "🎲", "🎁", "🪐", "🐙"],
-  ["🍎", "🍏", "🍒", "🍓", "🍊", "🍋", "🍐", "🍇", "🍍", "🥝", "🥑", "🍅", "🍑", "🍈", "🥥", "🍌", "🫐", "🍆"],
-  ["😀", "🙂", "😐", "😞", "😊", "😄", "🙃", "😌", "😎", "🤔", "😴", "🥱", "😬", "😶", "🙄", "😑", "😯", "🤐"],
-  ["🟥", "🟧", "🟨", "🟩", "🟦", "🟪", "🟫", "⬛", "⬜", "🔴", "🟠", "🟡", "🟢", "🔵", "🟣", "🟤", "⚫", "⚪"],
-  ["♠️", "♥️", "♦️", "♣️", "🂠", "🃏", "♟️", "♜", "♞", "♝", "♛", "♚", "⚜️", "✴️", "✳️", "❇️", "✡️", "☯️"],
+// Single large pool — every level draws randomly from this pool.
+const EMOJI_POOL: string[] = [
+  "🌞","🌙","⭐","🌈","🔥","💧","❄️","🧊","⚡","🌪️",
+  "🐱","🐶","🦊","🐻","🐼","🐨","🐯","🦁","🐸","🐵",
+  "🐙","🐳","🐬","🦋","🐞","🦄","🐢","🦉","🦩","🐝",
+  "🍎","🍊","🍋","🍉","🍇","🍓","🍑","🍍","🥝","🍒",
+  "🍕","🍔","🍟","🌮","🍩","🍪","🎂","🍫","🍿","🍣",
+  "🚀","🛸","🪐","☄️","🌌","🛰️","👽","🤖","🎈","🎁",
+  "❤️","💎","🎲","🎵","⚽","🏆","🎯","🎨","🎮","🃏",
 ];
-
-function tierForLevel(level: number) {
-  if (level <= 15) return EMOJI_TIERS[0];
-  if (level <= 30) return EMOJI_TIERS[1];
-  if (level <= 60) return EMOJI_TIERS[2];
-  if (level <= 90) return EMOJI_TIERS[3];
-  return EMOJI_TIERS[4];
-}
 
 export function getLevelConfig(level: number): LevelConfig {
   let rows = 2, cols = 2, timeLimit: number | undefined, moveLimit: number | undefined;
@@ -34,9 +29,7 @@ export function getLevelConfig(level: number): LevelConfig {
   else if (level <= 75) { rows = 4; cols = 5; timeLimit = 90; moveLimit = 50; }
   else if (level <= 90) { rows = 5; cols = 6; timeLimit = 120; moveLimit = 60; }
   else { rows = 6; cols = 6; timeLimit = 150; moveLimit = 70; }
-  // Level 1 special: ❤️ 🧊
-  const emojiSet = level === 1 ? ["❤️", "🧊"] : tierForLevel(level);
-  return { level, rows, cols, timeLimit, moveLimit, emojiSet };
+  return { level, rows, cols, timeLimit, moveLimit, emojiSet: EMOJI_POOL };
 }
 
 // ---------- Rewards ----------
