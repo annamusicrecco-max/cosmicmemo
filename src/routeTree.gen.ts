@@ -11,7 +11,6 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as RewardsRouteImport } from './routes/rewards'
 import { Route as LevelsRouteImport } from './routes/levels'
-import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PlayLevelRouteImport } from './routes/play.$level'
 
@@ -23,11 +22,6 @@ const RewardsRoute = RewardsRouteImport.update({
 const LevelsRoute = LevelsRouteImport.update({
   id: '/levels',
   path: '/levels',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminRoute = AdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -43,14 +37,12 @@ const PlayLevelRoute = PlayLevelRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
   '/levels': typeof LevelsRoute
   '/rewards': typeof RewardsRoute
   '/play/$level': typeof PlayLevelRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
   '/levels': typeof LevelsRoute
   '/rewards': typeof RewardsRoute
   '/play/$level': typeof PlayLevelRoute
@@ -58,22 +50,20 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
   '/levels': typeof LevelsRoute
   '/rewards': typeof RewardsRoute
   '/play/$level': typeof PlayLevelRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/admin' | '/levels' | '/rewards' | '/play/$level'
+  fullPaths: '/' | '/levels' | '/rewards' | '/play/$level'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin' | '/levels' | '/rewards' | '/play/$level'
-  id: '__root__' | '/' | '/admin' | '/levels' | '/rewards' | '/play/$level'
+  to: '/' | '/levels' | '/rewards' | '/play/$level'
+  id: '__root__' | '/' | '/levels' | '/rewards' | '/play/$level'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AdminRoute: typeof AdminRoute
   LevelsRoute: typeof LevelsRoute
   RewardsRoute: typeof RewardsRoute
   PlayLevelRoute: typeof PlayLevelRoute
@@ -95,13 +85,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LevelsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin': {
-      id: '/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AdminRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
@@ -121,7 +104,6 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AdminRoute: AdminRoute,
   LevelsRoute: LevelsRoute,
   RewardsRoute: RewardsRoute,
   PlayLevelRoute: PlayLevelRoute,
