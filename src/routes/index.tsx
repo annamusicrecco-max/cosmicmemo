@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Universe } from "@/components/Universe";
-import { loadState, vibrate, type GameState } from "@/lib/game-state";
+import { loadState, type GameState } from "@/lib/game-state";
 
 export const Route = createFileRoute("/")({
   component: Welcome,

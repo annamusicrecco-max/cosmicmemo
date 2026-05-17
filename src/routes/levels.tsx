@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { Universe } from "@/components/Universe";
-import { loadState, vibrate, type GameState } from "@/lib/game-state";
+import { loadState, type GameState } from "@/lib/game-state";
 
 export const Route = createFileRoute("/levels")({
   component: LevelsPage,
