@@ -2,17 +2,18 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Universe } from "@/components/Universe";
 import { Confetti } from "@/components/Confetti";
+import { AdModal } from "@/components/AdModal";
 import {
   beep,
   buildDeck,
   getLevelConfig,
   loadState,
-  pickReward,
   saveState,
   vibrate,
-  type ClaimedReward,
-  type Reward,
+  type InventoryItem,
+  type CardBack,
 } from "@/lib/game-state";
+import { REWARDS, pickRandomReward, type RewardKind } from "@/lib/rewards";
 
 export const Route = createFileRoute("/play/$level")({
   component: Play,
@@ -24,7 +25,7 @@ export const Route = createFileRoute("/play/$level")({
   }),
 });
 
-type CardState = { emoji: string; flipped: boolean; matched: boolean; mismatch: boolean };
+type CardState = { emoji: string; flipped: boolean; matched: boolean; mismatch: boolean; hint?: boolean };
 
 function Play() {
   const { level: levelStr } = Route.useParams();
@@ -40,21 +41,62 @@ function Play() {
   const [started, setStarted] = useState(false);
   const [won, setWon] = useState(false);
   const [failed, setFailed] = useState(false);
-  const [reward, setReward] = useState<Reward | null>(null);
+  const [confettiVisible, setConfettiVisible] = useState(false);
+  const [reward, setReward] = useState<RewardKind | null>(null);
   const [streak, setStreak] = useState(0);
+  const [cardBack, setCardBackUI] = useState<CardBack>("default");
+  const [premium, setPremium] = useState(false);
+
+  // Boost selector
+  const [showBoostPicker, setShowBoostPicker] = useState(false);
+  const [activeBoost, setActiveBoost] = useState<InventoryItem | null>(null);
+  const [doubleStreak, setDoubleStreak] = useState(false);
+
+  // Per-level once flags
+  const [extraTimeUsed, setExtraTimeUsed] = useState(false);
+  const [freezeUsed, setFreezeUsed] = useState(false);
+  const [peekUsed, setPeekUsed] = useState(false);
+  const [shuffleUsed, setShuffleUsed] = useState(false);
+  const [hintUsed, setHintUsed] = useState(false);
+  const [adBonus30Used, setAdBonus30Used] = useState(false);
+  const [adRevealUsed, setAdRevealUsed] = useState(false);
+  const [frozenUntil, setFrozenUntil] = useState(0);
+  const [peeking, setPeeking] = useState(false);
+
+  // Ad modal state
+  const [ad, setAd] = useState<null | "spin" | "plus30" | "reveal" | "reclaim">(null);
+
+  // Failed snapshot for "reclaim time"
+  const failedSnapshot = useRef<{ deck: CardState[]; timeLeft: number; moves: number; elapsed: number } | null>(null);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const resetBoard = () => {
+  const resetBoard = (preserveBoost = false) => {
     setDeck(buildDeck(cfg).map((emoji) => ({ emoji, flipped: false, matched: false, mismatch: false })));
     setSelected([]); setMoves(0); setElapsed(0); setTimeLeft(cfg.timeLimit ?? 0);
     setStarted(false); setWon(false); setFailed(false); setReward(null);
+    setExtraTimeUsed(false); setFreezeUsed(false); setPeekUsed(false);
+    setShuffleUsed(false); setHintUsed(false); setAdBonus30Used(false); setAdRevealUsed(false);
+    setConfettiVisible(false);
+    if (!preserveBoost) { setActiveBoost(null); setDoubleStreak(false); }
   };
 
   useEffect(() => {
     const s = loadState();
     setStreak(s.streak);
-    resetBoard();
+    setCardBackUI(s.cardBack);
+    setPremium(s.premium);
+
+    // Check for a pending boost selection from Rewards page
+    const pendingId = typeof sessionStorage !== "undefined" ? sessionStorage.getItem("pendingBoost") : null;
+    const pending = pendingId ? s.inventory.find((i) => i.id === pendingId && !i.usedAt) : null;
+    if (pending) {
+      setActiveBoost(pending);
+      sessionStorage.removeItem("pendingBoost");
+    } else if (s.inventory.some((i) => !i.usedAt && REWARDS[i.kind].boost)) {
+      setShowBoostPicker(true);
+    }
+    resetBoard(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [level]);
 
@@ -62,30 +104,28 @@ function Play() {
   useEffect(() => {
     if (!started || won || failed) return;
     intervalRef.current = setInterval(() => {
+      if (Date.now() < frozenUntil) return;
       setElapsed((t) => t + 1);
       if (cfg.timeLimit) {
         setTimeLeft((t) => {
-          if (t <= 1) { fail("time"); return 0; }
+          if (t <= 1) { fail(); return 0; }
           return t - 1;
         });
       }
     }, 1000);
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [started, won, failed]);
+  }, [started, won, failed, frozenUntil]);
 
-  const fail = (_reason: "time" | "moves") => {
+  const fail = () => {
+    failedSnapshot.current = { deck, timeLeft, moves, elapsed };
     setFailed(true);
-    const s = loadState();
-    s.streak = 0;
-    saveState(s);
-    setStreak(0);
-    
+    const s = loadState(); s.streak = 0; saveState(s); setStreak(0);
     beep("miss");
   };
 
   const onFlip = (idx: number) => {
-    if (won || failed) return;
+    if (won || failed || peeking) return;
     const c = deck[idx];
     if (!c || c.flipped || c.matched) return;
     if (selected.length >= 2) return;
@@ -99,11 +139,9 @@ function Play() {
     setSelected(sel);
 
     if (sel.length === 2) {
-      const newMoves = moves + 1;
-      setMoves(newMoves);
+      const newMoves = moves + 1; setMoves(newMoves);
       const [a, b] = sel;
       if (next[a].emoji === next[b].emoji) {
-        // match
         setTimeout(() => {
           setDeck((d) => {
             const nd = d.slice();
@@ -113,11 +151,9 @@ function Play() {
           });
           beep("match");
           setSelected([]);
-          // win check
           setTimeout(() => checkWin(), 50);
         }, 250);
       } else {
-        // mismatch
         setTimeout(() => {
           setDeck((d) => {
             const nd = d.slice();
@@ -139,77 +175,152 @@ function Play() {
       }
       if (cfg.moveLimit && newMoves >= cfg.moveLimit) {
         setTimeout(() => {
-          // only fail if not won
-          setDeck((d) => {
-            const allMatched = d.every((c) => c.matched);
-            if (!allMatched) fail("moves");
-            return d;
-          });
+          setDeck((d) => { if (!d.every((c) => c.matched)) fail(); return d; });
         }, 900);
       }
     }
   };
 
   const checkWin = () => {
-    setDeck((d) => {
-      if (d.every((c) => c.matched)) winLevel();
-      return d;
-    });
+    setDeck((d) => { if (d.every((c) => c.matched)) winLevel(); return d; });
   };
 
   const winLevel = () => {
     setWon(true);
     if (intervalRef.current) clearInterval(intervalRef.current);
     beep("win");
+    setConfettiVisible(true);
+    setTimeout(() => setConfettiVisible(false), 2200);
+
     const s = loadState();
     if (!s.completed.includes(level)) s.completed.push(level);
-    s.streak += 1;
+    s.streak += doubleStreak ? 2 : 1;
     s.highestUnlocked = Math.max(s.highestUnlocked, Math.min(100, level + 1));
+
+    // Earn a random reward and add to inventory
+    const kind = pickRandomReward(level);
+    const item: InventoryItem = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, kind, level, earnedAt: Date.now() };
+    s.inventory.unshift(item);
+
+    // Consume used boost
+    if (activeBoost) {
+      const found = s.inventory.find((x) => x.id === activeBoost.id);
+      if (found) found.usedAt = Date.now();
+    }
+
     saveState(s);
     setStreak(s.streak);
-    setReward(pickReward(level, s.streak));
+    setReward(kind);
   };
 
-  const claimReward = () => {
-    if (!reward) return;
-    const s = loadState();
-    const claim: ClaimedReward = { ...reward, level, claimedAt: Date.now() };
-    s.claimed.unshift(claim);
-    // increment advertiser claims
-    const ad = s.advertisers.find((a) => a.name === reward.advertiser);
-    if (ad) { ad.claims += 1; ad.remaining = Math.max(0, ad.remaining - 1); }
-    saveState(s);
-    try {
-      if (reward.code) navigator.clipboard?.writeText(reward.code);
-    } catch { /* ignore */ }
-    
-    alert(`Reward claimed! ${reward.code ? `Code "${reward.code}" copied to clipboard. ` : ""}In production, this would be a real code or link.`);
-  };
-
-  const next = () => {
-    if (level >= 100) {
-      alert("🌌 You completed all 100 levels! You are a Cosmic Master.");
-      navigate({ to: "/levels" });
-      return;
-    }
+  const goNext = () => {
+    if (level >= 100) { alert("🌌 You completed all 100 levels! You are a Cosmic Master."); navigate({ to: "/levels" }); return; }
     navigate({ to: "/play/$level", params: { level: String(level + 1) } });
+  };
+
+  // ---- Boost / power triggers ----
+  const useExtraTime = () => {
+    if (extraTimeUsed || !cfg.timeLimit) return;
+    setExtraTimeUsed(true); setTimeLeft((t) => t + 15);
+  };
+  const useFreeze = () => {
+    if (freezeUsed) return;
+    setFreezeUsed(true); setFrozenUntil(Date.now() + 5000);
+    setTimeout(() => setFrozenUntil(0), 5050);
+  };
+  const usePeek = () => {
+    if (peekUsed) return;
+    setPeekUsed(true); setPeeking(true);
+    setDeck((d) => d.map((c) => ({ ...c, flipped: true })));
+    setTimeout(() => {
+      setDeck((d) => d.map((c) => c.matched ? c : ({ ...c, flipped: false })));
+      setPeeking(false);
+    }, 1500);
+  };
+  const useShuffle = () => {
+    if (shuffleUsed) return;
+    setShuffleUsed(true);
+    setDeck((d) => {
+      const unmatchedIdx = d.map((c, i) => c.matched ? -1 : i).filter((i) => i >= 0);
+      const emojis = unmatchedIdx.map((i) => d[i].emoji);
+      for (let i = emojis.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [emojis[i], emojis[j]] = [emojis[j], emojis[i]]; }
+      const nd = d.slice();
+      unmatchedIdx.forEach((idx, k) => { nd[idx] = { ...nd[idx], emoji: emojis[k], flipped: false, mismatch: false }; });
+      setSelected([]);
+      return nd;
+    });
+  };
+  const useHint = () => {
+    if (hintUsed) return;
+    setHintUsed(true);
+    const remaining: Record<string, number[]> = {};
+    deck.forEach((c, i) => { if (!c.matched) (remaining[c.emoji] ||= []).push(i); });
+    const pair = Object.values(remaining).find((v) => v.length >= 2);
+    if (!pair) return;
+    setDeck((d) => { const nd = d.slice(); nd[pair[0]] = { ...nd[pair[0]], hint: true }; nd[pair[1]] = { ...nd[pair[1]], hint: true }; return nd; });
+    setTimeout(() => setDeck((d) => d.map((c) => ({ ...c, hint: false }))), 1000);
+  };
+
+  // Apply boost selected pre-level (auto for memory-booster)
+  useEffect(() => {
+    if (!activeBoost) return;
+    const def = REWARDS[activeBoost.kind];
+    if (def.boost === "memory-booster") setDoubleStreak(true);
+  }, [activeBoost]);
+
+  // ---- Ad-gated actions ----
+  const handleAdAction = (kind: "spin" | "plus30" | "reveal" | "reclaim") => {
+    if (premium) { runAdReward(kind); return; }
+    setAd(kind);
+  };
+  const runAdReward = (kind: "spin" | "plus30" | "reveal" | "reclaim") => {
+    if (kind === "plus30") {
+      if (adBonus30Used) return;
+      setAdBonus30Used(true); setTimeLeft((t) => t + 30);
+    } else if (kind === "reveal") {
+      if (adRevealUsed) return;
+      setAdRevealUsed(true); setPeeking(true);
+      setDeck((d) => d.map((c) => ({ ...c, flipped: true })));
+      setTimeout(() => { setDeck((d) => d.map((c) => c.matched ? c : ({ ...c, flipped: false }))); setPeeking(false); }, 2000);
+    } else if (kind === "reclaim") {
+      const snap = failedSnapshot.current;
+      if (snap) {
+        setDeck(snap.deck.map((c) => ({ ...c, mismatch: false })));
+        setTimeLeft(snap.timeLeft); setMoves(snap.moves); setElapsed(snap.elapsed);
+        setFailed(false); setStarted(true);
+      }
+    } else if (kind === "spin") {
+      const bonusKind = pickRandomReward(level);
+      const s = loadState();
+      s.inventory.unshift({ id: `${Date.now()}-spin`, kind: bonusKind, level, earnedAt: Date.now() });
+      saveState(s);
+      alert(`🎡 Bonus wheel landed on: ${REWARDS[bonusKind].name}!`);
+    }
   };
 
   const minSec = (n: number) => `${String(Math.floor(n / 60)).padStart(2, "0")}:${String(n % 60).padStart(2, "0")}`;
   const timePct = cfg.timeLimit ? (timeLeft / cfg.timeLimit) * 100 : 0;
 
+  // Card back styling
+  const cardBackStyle = cardBack === "default"
+    ? { background: "linear-gradient(135deg, oklch(0.97 0.04 90), oklch(0.92 0.08 320))", color: "oklch(0.15 0 0)" }
+    : { backgroundImage: `url(/images/rewards/card-back-${cardBack}.jpg)`, backgroundSize: "cover", backgroundPosition: "center", color: "#fff", textShadow: "0 2px 8px rgba(0,0,0,0.7)" };
+
+  // Available boosts (functional only)
+  const availableBoosts = (typeof window !== "undefined" ? loadState().inventory : []).filter((i) => !i.usedAt && REWARDS[i.kind].boost);
+
   return (
     <main className="relative min-h-screen overflow-hidden">
       <Universe parallax={0.2} />
-      <Confetti active={won} />
+      <Confetti active={confettiVisible} />
 
-      <header className="flex items-center justify-between gap-3 px-4 py-3 flex-wrap">
-        <Link to="/levels" className="glass rounded-full px-4 py-2 text-sm hover:scale-105 transition">← Map</Link>
-        <div className="flex gap-3 items-center text-sm">
-          <Badge>🎯 L{level}</Badge>
+      <header className="flex items-center justify-between gap-3 px-4 py-3 flex-wrap mt-2">
+        <Link to="/levels" className="glass rounded-full px-4 py-2 text-sm font-semibold hover:scale-105 transition">← Map</Link>
+        <div className="flex gap-2 items-center text-sm flex-wrap justify-end">
+          <Badge>L{level}</Badge>
           <Badge>⏱ {cfg.timeLimit ? minSec(timeLeft) : minSec(elapsed)}</Badge>
-          <Badge>🎲 {cfg.moveLimit ? `${cfg.moveLimit - moves}` : moves}{cfg.moveLimit ? "" : " moves"}</Badge>
-          <Badge>🔥 {streak}</Badge>
+          <Badge>{cfg.moveLimit ? `${cfg.moveLimit - moves} left` : `${moves} moves`}</Badge>
+          <Badge>🔥 {streak}{doubleStreak ? " ×2" : ""}</Badge>
         </div>
       </header>
 
@@ -220,49 +331,108 @@ function Play() {
         </div>
       )}
 
+      {/* In-game action bar */}
+      <div className="flex flex-wrap gap-2 justify-center px-4 mt-3">
+        {activeBoost && (() => {
+          const def = REWARDS[activeBoost.kind];
+          const fn = def.boost === "extra-time" ? useExtraTime
+                  : def.boost === "freeze-timer" ? useFreeze
+                  : def.boost === "reveal-peek" ? usePeek
+                  : def.boost === "shuffle-swap" ? useShuffle
+                  : def.boost === "hint-spark" ? useHint
+                  : null;
+          if (!fn) return null;
+          const used = (def.boost === "extra-time" && extraTimeUsed) || (def.boost === "freeze-timer" && freezeUsed)
+                    || (def.boost === "reveal-peek" && peekUsed) || (def.boost === "shuffle-swap" && shuffleUsed)
+                    || (def.boost === "hint-spark" && hintUsed);
+          return <button onClick={fn} disabled={used} className="glass rounded-full px-3 py-1.5 text-xs font-semibold disabled:opacity-40">⚡ {def.name}{used ? " (used)" : ""}</button>;
+        })()}
+        {cfg.timeLimit && (
+          <button onClick={() => handleAdAction("plus30")} disabled={adBonus30Used} className="glass rounded-full px-3 py-1.5 text-xs font-semibold disabled:opacity-40">+30 sec{premium ? "" : " (Watch Ad)"}</button>
+        )}
+        <button onClick={() => handleAdAction("reveal")} disabled={adRevealUsed} className="glass rounded-full px-3 py-1.5 text-xs font-semibold disabled:opacity-40">Reveal{premium ? "" : " (Watch Ad)"}</button>
+      </div>
+
       <div className="flex items-center justify-center p-4">
         <div
           className="grid gap-2 sm:gap-3 w-full max-w-[min(90vw,90vh)]"
           style={{ gridTemplateColumns: `repeat(${cfg.cols}, minmax(0, 1fr))` }}
         >
           {deck.map((c, i) => (
-            <Card key={i} card={c} onClick={() => onFlip(i)} />
+            <Card key={i} card={c} onClick={() => onFlip(i)} backStyle={cardBackStyle} />
           ))}
         </div>
       </div>
 
+      {/* Pre-level boost picker */}
+      {showBoostPicker && !activeBoost && (
+        <Modal>
+          <h2 className="text-xl font-black mb-1">Pick a Boost</h2>
+          <p className="text-xs text-muted-foreground mb-4">Use up to one boost for this level (optional).</p>
+          {availableBoosts.length === 0 ? (
+            <p className="text-sm text-muted-foreground mb-4">No boosts available.</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-2 mb-4 max-h-60 overflow-y-auto">
+              {availableBoosts.map((b) => {
+                const def = REWARDS[b.kind];
+                return (
+                  <button key={b.id} onClick={() => { setActiveBoost(b); setShowBoostPicker(false); }}
+                    className="glass rounded-xl p-2 text-left hover:scale-105 transition">
+                    <img src={def.image} alt={def.name} className="rounded-lg w-full mb-1" style={{ aspectRatio: "1/1", objectFit: "cover" }} />
+                    <div className="text-xs font-bold">{def.name}</div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          <button onClick={() => setShowBoostPicker(false)} className="btn-cosmic w-full !py-2.5">Skip</button>
+        </Modal>
+      )}
+
+      {/* Level Failed */}
       {failed && (
         <Modal>
-          <div className="text-6xl mb-3">😢</div>
+          <div className="text-5xl mb-3">😢</div>
           <h2 className="text-2xl font-black mb-2">Level Failed</h2>
-          <p className="text-muted-foreground mb-6">Your streak was reset. Give it another shot!</p>
-          <div className="flex gap-3 justify-center">
-            <button className="btn-cosmic" onClick={() => { resetBoard(); }}>Try Again</button>
-            <Link to="/levels" className="glass rounded-full px-5 py-3">Back to Map</Link>
+          <p className="text-muted-foreground mb-5 text-sm">Your streak was reset.</p>
+          <button onClick={() => handleAdAction("reclaim")} className="btn-cosmic w-full mb-3 !py-2.5">
+            {premium ? "Reclaim Time" : "Watch Ad to Reclaim Time"}
+          </button>
+          <div className="flex gap-2 justify-center">
+            <button className="glass rounded-full px-4 py-2 text-sm font-semibold" onClick={() => resetBoard(false)}>Try Again</button>
+            <Link to="/levels" className="glass rounded-full px-4 py-2 text-sm font-semibold">Back</Link>
           </div>
         </Modal>
       )}
 
-      {won && reward && (
+      {/* Level Complete */}
+      {won && reward && !confettiVisible && (
         <Modal>
-          <div className="text-5xl mb-2">🎉</div>
-          <h2 className="text-2xl font-black text-glow">Level {level} Complete!</h2>
-          <p className="text-sm text-muted-foreground mt-1">Streak 🔥 {streak} · {moves} moves · {minSec(elapsed)}</p>
+          <h2 className="text-2xl font-black text-glow mb-1">Level {level} Complete</h2>
+          <p className="text-xs text-muted-foreground mb-4">Streak 🔥 {streak} · {moves} moves · {minSec(elapsed)}</p>
 
-          <div className="mt-5 p-5 rounded-2xl border border-border/60"
-            style={{ background: "linear-gradient(135deg, oklch(0.25 0.12 320 / 0.6), oklch(0.25 0.12 200 / 0.6))" }}>
-            <div className="text-xs uppercase tracking-widest text-accent">{reward.advertiser}</div>
-            <div className="text-lg font-bold mt-1">{reward.title}</div>
-            {reward.code && <div className="mt-2 font-mono text-sm bg-background/40 rounded px-2 py-1 inline-block">{reward.code}</div>}
-            <button onClick={claimReward} className="btn-cosmic mt-4 w-full">🎁 Claim Reward</button>
+          <div className="mb-4">
+            <img src={REWARDS[reward].image} alt={REWARDS[reward].name}
+              className="mx-auto rounded-2xl"
+              style={{ width: "80%", aspectRatio: "1/1", objectFit: "cover" }} />
+            <div className="text-xs uppercase tracking-widest text-accent mt-3">Reward earned</div>
+            <div className="text-lg font-bold">{REWARDS[reward].name}</div>
+            <div className="text-xs text-muted-foreground">{REWARDS[reward].description}</div>
           </div>
 
-          <div className="flex gap-3 mt-5 justify-center">
-            <button className="btn-cosmic" onClick={() => { next(); }}>Next Level →</button>
-            <Link to="/levels" className="glass rounded-full px-5 py-3">Back to Map</Link>
+          <button onClick={() => handleAdAction("spin")} className="glass rounded-full w-full py-2 text-sm font-semibold mb-3">
+            🎡 {premium ? "Spin Bonus Wheel" : "Watch Ad to Spin"}
+          </button>
+
+          <div className="flex gap-2 justify-center">
+            <button className="btn-cosmic !px-5 !py-2.5 text-sm" onClick={goNext}>Next Level</button>
+            <Link to="/levels" className="glass rounded-full px-5 py-2.5 text-sm font-semibold">Back</Link>
           </div>
         </Modal>
       )}
+
+      <AdModal open={ad !== null} label={ad === "reclaim" ? "Restoring your level…" : "Your reward will unlock shortly"}
+        onDone={() => { const k = ad; setAd(null); if (k) runAdReward(k); }} />
     </main>
   );
 }
@@ -274,12 +444,12 @@ function Badge({ children }: { children: React.ReactNode }) {
 function Modal({ children }: { children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-background/70 backdrop-blur-sm">
-      <div className="glass rounded-3xl p-8 max-w-md w-full text-center pop-in">{children}</div>
+      <div className="glass rounded-3xl p-6 max-w-md w-full text-center pop-in">{children}</div>
     </div>
   );
 }
 
-function Card({ card, onClick }: { card: CardState; onClick: () => void }) {
+function Card({ card, onClick, backStyle }: { card: CardState; onClick: () => void; backStyle: React.CSSProperties }) {
   const showFront = card.flipped || card.matched;
   return (
     <button
@@ -290,14 +460,14 @@ function Card({ card, onClick }: { card: CardState; onClick: () => void }) {
       aria-label={showFront ? card.emoji : "hidden card"}
     >
       <div
-        className={`absolute inset-0 card-3d rounded-2xl ${showFront ? "flipped" : ""} ${card.matched ? "matched-glow" : ""} ${card.mismatch ? "mismatch-flash" : ""}`}
+        className={`absolute inset-0 card-3d rounded-2xl ${showFront ? "flipped" : ""} ${card.matched ? "matched-glow" : ""} ${card.mismatch ? "mismatch-flash" : ""} ${card.hint ? "hint-glow" : ""}`}
       >
-        <div className="card-face absolute inset-0 rounded-2xl overflow-hidden flex items-center justify-center text-4xl sm:text-5xl"
+        <div className="card-face absolute inset-0 rounded-2xl overflow-hidden flex items-center justify-center"
           style={{ background: "linear-gradient(135deg, oklch(0.55 0.18 290), oklch(0.45 0.18 240))", border: "1px solid oklch(1 0 0 / 0.18)" }}>
           <span className="text-glow text-2xl">✦</span>
         </div>
         <div className="card-face card-back absolute inset-0 rounded-2xl overflow-hidden flex items-center justify-center text-4xl sm:text-5xl"
-          style={{ background: "linear-gradient(135deg, oklch(0.97 0.04 90), oklch(0.92 0.08 320))", color: "oklch(0.15 0 0)", border: "1px solid oklch(1 0 0 / 0.3)" }}>
+          style={{ ...backStyle, border: "1px solid oklch(1 0 0 / 0.3)" }}>
           <span>{card.emoji}</span>
         </div>
       </div>
