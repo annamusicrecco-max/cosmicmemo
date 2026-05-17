@@ -49,10 +49,10 @@ function LevelsPage() {
     <main className="relative min-h-screen flex flex-col overflow-hidden">
       <Universe parallax={0.4} />
 
-      <header className="flex items-center justify-between px-6 py-4">
-        <Link to="/" className="glass rounded-full px-4 py-2 text-sm hover:scale-105 transition">← Home</Link>
-        <h1 className="text-2xl font-black text-glow">Choose a Level</h1>
-        <Link to="/rewards" className="glass rounded-full px-4 py-2 text-sm hover:scale-105 transition">🎁 Rewards</Link>
+      <header className="flex items-center justify-between gap-2 px-3 sm:px-6 py-3 sm:py-4 flex-wrap">
+        <Link to="/" className="glass rounded-full px-3 py-2 text-xs sm:text-sm hover:scale-105 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent">← Home</Link>
+        <h1 className="order-last sm:order-none basis-full sm:basis-auto text-center text-lg sm:text-2xl font-black text-glow">Choose a Level</h1>
+        <Link to="/rewards" className="glass rounded-full px-3 py-2 text-xs sm:text-sm hover:scale-105 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent">🎁 Rewards</Link>
       </header>
 
       <div className="flex-1 flex items-center">
