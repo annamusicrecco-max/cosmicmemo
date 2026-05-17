@@ -18,7 +18,7 @@ function Rewards() {
       <div className="max-w-3xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <Link to="/" className="glass rounded-full px-4 py-2 text-sm">← Home</Link>
-          <h1 className="text-3xl font-black text-glow">My Rewards</h1>
+          <h1 className="text-3xl font-black text-glow">Rewards</h1>
           <Link to="/levels" className="glass rounded-full px-4 py-2 text-sm">Levels →</Link>
         </div>
 

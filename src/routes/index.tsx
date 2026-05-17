@@ -46,9 +46,7 @@ function Welcome() {
       </Link>
 
       <div className="mt-6 flex flex-wrap justify-center gap-x-3 gap-y-1 text-sm">
-        <Link to="/rewards" className="text-muted-foreground hover:text-foreground underline-offset-4 hover:underline">My Rewards</Link>
-        <span className="text-muted-foreground">·</span>
-        <Link to="/admin" className="text-muted-foreground hover:text-foreground underline-offset-4 hover:underline">Admin</Link>
+        <Link to="/rewards" className="text-muted-foreground hover:text-foreground underline-offset-4 hover:underline">Rewards</Link>
       </div>
     </main>
   );
