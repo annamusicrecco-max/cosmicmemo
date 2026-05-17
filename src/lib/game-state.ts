@@ -9,7 +9,7 @@ export type LevelConfig = {
   emojiSet: string[];
 };
 
-// Single large pool — every level draws randomly from this pool.
+// Broad emoji pool (50+) used for easier levels.
 const EMOJI_POOL: string[] = [
   "🌞","🌙","⭐","🌈","🔥","💧","❄️","🧊","⚡","🌪️",
   "🐱","🐶","🦊","🐻","🐼","🐨","🐯","🦁","🐸","🐵",
@@ -20,16 +20,45 @@ const EMOJI_POOL: string[] = [
   "❤️","💎","🎲","🎵","⚽","🏆","🎯","🎨","🎮","🃏",
 ];
 
+// Visually-similar category pools — used at level 26+ to ramp difficulty.
+const HARD_CATEGORIES: string[][] = [
+  // Yellow/orange fruits
+  ["🍋","🍌","🍍","🍊","🍑","🥭","🍈","🌽","🧀","🥯","🟡","🟨"],
+  // Blue / cool shapes & objects
+  ["🔵","🟦","💙","🧊","💎","🫐","🌐","🔷","🔹","💧","🐳","🐬"],
+  // Red / pink hearts & fruits
+  ["❤️","🍎","🍓","🍒","🌹","🟥","🔴","💖","💗","💓","💘","🍅"],
+  // Green leaves & foods
+  ["🥝","🥦","🥒","🍀","🌿","🍃","🌵","🟢","🟩","💚","🐸","🥬"],
+  // Round faces (smileys)
+  ["😀","😃","😄","😁","😆","😊","🙂","😉","😌","😋","🤗","🤩"],
+  // Space objects
+  ["🌑","🌒","🌓","🌔","🌕","🌖","🌗","🌘","🪐","☄️","🌌","🛸"],
+  // Purple/violet
+  ["🟣","🟪","💜","🍇","🔮","☂️","👾","🦄","🦝","🪻","🫐","🍆"],
+];
+
 export function getLevelConfig(level: number): LevelConfig {
   let rows = 2, cols = 2, timeLimit: number | undefined, moveLimit: number | undefined;
-  if (level <= 15) { rows = 2; cols = 2; }
-  else if (level <= 30) { rows = 2; cols = 3; }
-  else if (level <= 45) { rows = 3; cols = 4; timeLimit = 60; }
-  else if (level <= 60) { rows = 4; cols = 4; timeLimit = 75; }
-  else if (level <= 75) { rows = 4; cols = 5; timeLimit = 90; moveLimit = 50; }
-  else if (level <= 90) { rows = 5; cols = 6; timeLimit = 120; moveLimit = 60; }
-  else { rows = 6; cols = 6; timeLimit = 150; moveLimit = 70; }
-  return { level, rows, cols, timeLimit, moveLimit, emojiSet: EMOJI_POOL };
+  if (level === 1)          { rows = 2; cols = 2; }
+  else if (level <= 3)      { rows = 2; cols = 3; }
+  else if (level <= 6)      { rows = 3; cols = 4; }
+  else if (level <= 9)      { rows = 4; cols = 4; }
+  else if (level === 10)    { rows = 4; cols = 4; timeLimit = 75; }
+  else if (level <= 15)     { rows = 4; cols = 5; timeLimit = 90; }
+  else if (level <= 25)     { rows = 5; cols = 6; timeLimit = 120; }
+  else if (level <= 40)     { rows = 6; cols = 6; timeLimit = 150; }
+  else if (level <= 60)     { rows = 6; cols = 6; timeLimit = 120; }
+  else if (level <= 80)     { rows = 6; cols = 6; timeLimit = 90;  moveLimit = 60; }
+  else                      { rows = 6; cols = 6; timeLimit = 75;  moveLimit = 50; }
+
+  // Pick a visually-similar category for harder levels (26+) to increase difficulty.
+  let emojiSet = EMOJI_POOL;
+  if (level >= 26) {
+    const cat = HARD_CATEGORIES[Math.floor(Math.random() * HARD_CATEGORIES.length)];
+    if (cat.length >= (rows * cols) / 2) emojiSet = cat;
+  }
+  return { level, rows, cols, timeLimit, moveLimit, emojiSet };
 }
 
 // ---------- Rewards ----------
