@@ -73,7 +73,7 @@ function LevelsPage() {
                 <button
                   key={lvl}
                   onClick={() => launch(lvl, unlocked)}
-                  className={`shrink-0 w-28 h-36 rounded-2xl glass relative flex flex-col items-center justify-center transition-transform hover:scale-110 ${unlocked ? "" : "level-locked"}`}
+                  className={`shrink-0 w-24 h-32 sm:w-28 sm:h-36 rounded-2xl glass relative flex flex-col items-center justify-center transition-transform hover:scale-110 focus:outline-none focus-visible:ring-4 focus-visible:ring-accent ${unlocked ? "" : "level-locked"}`}
                   style={unlocked ? { boxShadow: "0 0 30px oklch(0.72 0.22 320 / 0.45)", border: "1px solid oklch(0.78 0.2 195 / 0.4)" } : {}}
                   aria-label={`Level ${lvl} ${unlocked ? "unlocked" : "locked"}`}
                 >
