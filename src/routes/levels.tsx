@@ -23,6 +23,19 @@ function LevelsPage() {
 
   useEffect(() => { setState(loadState()); }, []);
 
+  // Auto-scroll to current level when ready
+  useEffect(() => {
+    if (!state || !scrollerRef.current) return;
+    const target = scrollerRef.current.querySelector<HTMLButtonElement>(`[data-level="${state.highestUnlocked}"]`);
+    if (target && scrollerRef.current) {
+      const el = scrollerRef.current;
+      const offset = target.offsetLeft - el.clientWidth / 2 + target.clientWidth / 2;
+      el.scrollTo({ left: Math.max(0, offset), behavior: "smooth" });
+    }
+  }, [state]);
+
+  const fmtTime = (s: number) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+
   const onPointerDown = (e: React.PointerEvent) => {
     const el = scrollerRef.current; if (!el) return;
     drag.current = { active: true, startX: e.clientX, scrollLeft: el.scrollLeft, moved: 0 };
@@ -84,6 +97,7 @@ function LevelsPage() {
               return (
                 <button
                   key={lvl}
+                  data-level={lvl}
                   onClick={() => launch(lvl, unlocked)}
                   className={`shrink-0 w-24 h-32 sm:w-28 sm:h-36 rounded-2xl glass relative flex flex-col items-center justify-center transition-transform hover:scale-110 focus:outline-none focus-visible:ring-4 focus-visible:ring-accent ${unlocked ? "" : "level-locked"}`}
                   style={unlocked ? { boxShadow: "0 0 30px oklch(0.72 0.22 320 / 0.45)", border: "1px solid oklch(0.78 0.2 195 / 0.4)" } : {}}
@@ -99,8 +113,8 @@ function LevelsPage() {
                       <span aria-label="locked">🔒</span>
                     )}
                   </div>
-                  {lvl % 10 === 0 && unlocked && (
-                    <div className="absolute -top-2 -right-2 bg-flame text-background text-[10px] rounded-full px-2 py-0.5 font-bold">BOSS</div>
+                  {completed && state?.times[lvl] != null && (
+                    <div className="text-[10px] text-accent font-semibold mt-1 tabular-nums">{fmtTime(state.times[lvl])}</div>
                   )}
                 </button>
               );

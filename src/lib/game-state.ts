@@ -73,6 +73,7 @@ export type GameState = {
   premium: boolean;
   muted: boolean;
   cardBack: CardBack;
+  times: Record<number, number>;
 };
 
 export function defaultState(): GameState {
@@ -84,6 +85,7 @@ export function defaultState(): GameState {
     premium: false,
     muted: false,
     cardBack: "default",
+    times: {},
   };
 }
 

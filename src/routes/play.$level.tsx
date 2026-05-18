@@ -14,6 +14,7 @@ import {
   type CardBack,
 } from "@/lib/game-state";
 import { REWARDS, pickRandomReward, type RewardKind } from "@/lib/rewards";
+import { setMuted as setAudioMuted } from "@/lib/audio";
 
 export const Route = createFileRoute("/play/$level")({
   component: Play,
@@ -47,10 +48,11 @@ function Play() {
   const [cardBack, setCardBackUI] = useState<CardBack>("default");
   const [premium, setPremium] = useState(false);
 
-  // Boost selector
-  const [showBoostPicker, setShowBoostPicker] = useState(false);
-  const [activeBoost, setActiveBoost] = useState<InventoryItem | null>(null);
+  // Boost menu
+  const [showBoostMenu, setShowBoostMenu] = useState(false);
+  const [boostUsedThisLevel, setBoostUsedThisLevel] = useState(false);
   const [doubleStreak, setDoubleStreak] = useState(false);
+  const [boostFeedback, setBoostFeedback] = useState<string | null>(null);
 
   // Per-level once flags
   const [extraTimeUsed, setExtraTimeUsed] = useState(false);
@@ -63,6 +65,9 @@ function Play() {
   const [frozenUntil, setFrozenUntil] = useState(0);
   const [peeking, setPeeking] = useState(false);
 
+  // Mute toggle (in-game)
+  const [muted, setMutedState] = useState(false);
+
   // Ad modal state
   const [ad, setAd] = useState<null | "spin" | "plus30" | "reveal" | "reclaim">(null);
 
@@ -71,14 +76,14 @@ function Play() {
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const resetBoard = (preserveBoost = false) => {
+  const resetBoard = () => {
     setDeck(buildDeck(cfg).map((emoji) => ({ emoji, flipped: false, matched: false, mismatch: false })));
     setSelected([]); setMoves(0); setElapsed(0); setTimeLeft(cfg.timeLimit ?? 0);
     setStarted(false); setWon(false); setFailed(false); setReward(null);
     setExtraTimeUsed(false); setFreezeUsed(false); setPeekUsed(false);
     setShuffleUsed(false); setHintUsed(false); setAdBonus30Used(false); setAdRevealUsed(false);
     setConfettiVisible(false);
-    if (!preserveBoost) { setActiveBoost(null); setDoubleStreak(false); }
+    setBoostUsedThisLevel(false); setDoubleStreak(false);
   };
 
   useEffect(() => {
@@ -86,17 +91,17 @@ function Play() {
     setStreak(s.streak);
     setCardBackUI(s.cardBack);
     setPremium(s.premium);
+    setMutedState(s.muted);
 
-    // Check for a pending boost selection from Rewards page
+    // Apply pending boost from Rewards page immediately
     const pendingId = typeof sessionStorage !== "undefined" ? sessionStorage.getItem("pendingBoost") : null;
     const pending = pendingId ? s.inventory.find((i) => i.id === pendingId && !i.usedAt) : null;
     if (pending) {
-      setActiveBoost(pending);
       sessionStorage.removeItem("pendingBoost");
-    } else if (s.inventory.some((i) => !i.usedAt && REWARDS[i.kind].boost)) {
-      setShowBoostPicker(true);
+      // Consume immediately and apply effect after board reset
+      setTimeout(() => applyBoost(pending), 50);
     }
-    resetBoard(true);
+    resetBoard();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [level]);
 
@@ -197,16 +202,14 @@ function Play() {
     s.streak += doubleStreak ? 2 : 1;
     s.highestUnlocked = Math.max(s.highestUnlocked, Math.min(100, level + 1));
 
+    // Save completion time (use best/fastest if replayed)
+    const prev = s.times[level];
+    s.times[level] = prev ? Math.min(prev, elapsed) : elapsed;
+
     // Earn a random reward and add to inventory
     const kind = pickRandomReward(level);
     const item: InventoryItem = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, kind, level, earnedAt: Date.now() };
     s.inventory.unshift(item);
-
-    // Consume used boost
-    if (activeBoost) {
-      const found = s.inventory.find((x) => x.id === activeBoost.id);
-      if (found) found.usedAt = Date.now();
-    }
 
     saveState(s);
     setStreak(s.streak);
@@ -219,23 +222,13 @@ function Play() {
   };
 
   // ---- Boost / power triggers ----
-  const useExtraTime = () => {
-    if (extraTimeUsed || !cfg.timeLimit) return;
-    setExtraTimeUsed(true); setTimeLeft((t) => t + 15);
-  };
-  const useFreeze = () => {
-    if (freezeUsed) return;
-    setFreezeUsed(true); setFrozenUntil(Date.now() + 5000);
-    setTimeout(() => setFrozenUntil(0), 5050);
-  };
+  const useExtraTime = () => { if (extraTimeUsed || !cfg.timeLimit) return; setExtraTimeUsed(true); setTimeLeft((t) => t + 15); };
+  const useFreeze = () => { if (freezeUsed) return; setFreezeUsed(true); setFrozenUntil(Date.now() + 5000); setTimeout(() => setFrozenUntil(0), 5050); };
   const usePeek = () => {
     if (peekUsed) return;
     setPeekUsed(true); setPeeking(true);
     setDeck((d) => d.map((c) => ({ ...c, flipped: true })));
-    setTimeout(() => {
-      setDeck((d) => d.map((c) => c.matched ? c : ({ ...c, flipped: false })));
-      setPeeking(false);
-    }, 1500);
+    setTimeout(() => { setDeck((d) => d.map((c) => c.matched ? c : ({ ...c, flipped: false }))); setPeeking(false); }, 1500);
   };
   const useShuffle = () => {
     if (shuffleUsed) return;
@@ -261,12 +254,34 @@ function Play() {
     setTimeout(() => setDeck((d) => d.map((c) => ({ ...c, hint: false }))), 1000);
   };
 
-  // Apply boost selected pre-level (auto for memory-booster)
-  useEffect(() => {
-    if (!activeBoost) return;
-    const def = REWARDS[activeBoost.kind];
-    if (def.boost === "memory-booster") setDoubleStreak(true);
-  }, [activeBoost]);
+  // Apply a boost (consumes the inventory item immediately, one per level)
+  const applyBoost = (item: InventoryItem) => {
+    if (boostUsedThisLevel) { setBoostFeedback("Only one boost per level"); setTimeout(() => setBoostFeedback(null), 1800); return; }
+    const def = REWARDS[item.kind];
+    const fx = def.boost;
+    if (!fx) return;
+    if (fx === "extra-time") useExtraTime();
+    else if (fx === "freeze-timer") useFreeze();
+    else if (fx === "reveal-peek") usePeek();
+    else if (fx === "shuffle-swap") useShuffle();
+    else if (fx === "hint-spark") useHint();
+    else if (fx === "memory-booster") setDoubleStreak(true);
+    // Consume the inventory item
+    const s = loadState();
+    const found = s.inventory.find((x) => x.id === item.id);
+    if (found && !found.usedAt) { found.usedAt = Date.now(); saveState(s); }
+    setBoostUsedThisLevel(true);
+    setShowBoostMenu(false);
+    setBoostFeedback(`✨ ${def.name} activated`);
+    setTimeout(() => setBoostFeedback(null), 1800);
+  };
+
+  const toggleMute = () => {
+    const next = !muted;
+    setMutedState(next);
+    setAudioMuted(next);
+    const s = loadState(); s.muted = next; saveState(s);
+  };
 
   // ---- Ad-gated actions ----
   const handleAdAction = (kind: "spin" | "plus30" | "reveal" | "reclaim") => {
@@ -306,7 +321,7 @@ function Play() {
     ? { background: "linear-gradient(135deg, oklch(0.97 0.04 90), oklch(0.92 0.08 320))", color: "oklch(0.15 0 0)" }
     : { backgroundImage: `url(/images/rewards/card-back-${cardBack}.jpg)`, backgroundSize: "cover", backgroundPosition: "center", color: "#fff", textShadow: "0 2px 8px rgba(0,0,0,0.7)" };
 
-  // Available boosts (functional only)
+  // Available in-game boosts (functional only, exclude level-skipper)
   const availableBoosts = (typeof window !== "undefined" ? loadState().inventory : []).filter((i) => !i.usedAt && REWARDS[i.kind].boost);
 
   return (
@@ -321,37 +336,71 @@ function Play() {
           <Badge>⏱ {cfg.timeLimit ? minSec(timeLeft) : minSec(elapsed)}</Badge>
           <Badge>{cfg.moveLimit ? `${cfg.moveLimit - moves} left` : `${moves} moves`}</Badge>
           <Badge>🔥 {streak}{doubleStreak ? " ×2" : ""}</Badge>
+          <button onClick={toggleMute} aria-label={muted ? "Unmute music" : "Mute music"}
+            className="glass rounded-full w-9 h-9 flex items-center justify-center text-base hover:scale-110 transition">
+            {muted ? "🔇" : "🔊"}
+          </button>
         </div>
       </header>
 
       {cfg.timeLimit && (
-        <div className="h-1.5 bg-muted/40 mx-4 rounded-full overflow-hidden">
+        <div className="h-3 bg-muted/40 mx-4 rounded-full overflow-hidden shadow-inner">
           <div className="h-full transition-[width] duration-1000 ease-linear"
-            style={{ width: `${timePct}%`, background: timePct > 30 ? "linear-gradient(90deg,var(--accent),var(--primary))" : "var(--destructive)" }} />
+            style={{
+              width: `${timePct}%`,
+              background: timePct > 30
+                ? "linear-gradient(90deg, oklch(0.78 0.2 60), oklch(0.7 0.25 30))"
+                : "linear-gradient(90deg, oklch(0.7 0.25 30), oklch(0.6 0.28 15))",
+              boxShadow: timePct <= 30 ? "0 0 12px oklch(0.65 0.25 25 / 0.8)" : "none",
+            }} />
         </div>
       )}
 
       {/* In-game action bar */}
-      <div className="flex flex-wrap gap-2 justify-center px-4 mt-3">
-        {activeBoost && (() => {
-          const def = REWARDS[activeBoost.kind];
-          const fn = def.boost === "extra-time" ? useExtraTime
-                  : def.boost === "freeze-timer" ? useFreeze
-                  : def.boost === "reveal-peek" ? usePeek
-                  : def.boost === "shuffle-swap" ? useShuffle
-                  : def.boost === "hint-spark" ? useHint
-                  : null;
-          if (!fn) return null;
-          const used = (def.boost === "extra-time" && extraTimeUsed) || (def.boost === "freeze-timer" && freezeUsed)
-                    || (def.boost === "reveal-peek" && peekUsed) || (def.boost === "shuffle-swap" && shuffleUsed)
-                    || (def.boost === "hint-spark" && hintUsed);
-          return <button onClick={fn} disabled={used} className="glass rounded-full px-3 py-1.5 text-xs font-semibold disabled:opacity-40">⚡ {def.name}{used ? " (used)" : ""}</button>;
-        })()}
+      <div className="flex flex-wrap gap-2 justify-center px-4 mt-3 relative">
+        <div className="relative">
+          <button
+            onClick={() => setShowBoostMenu((v) => !v)}
+            disabled={boostUsedThisLevel}
+            className="btn-cosmic !py-2 !px-4 text-xs disabled:opacity-50 inline-flex items-center gap-1"
+          >
+            ⚡ Boost {availableBoosts.length > 0 && !boostUsedThisLevel ? `(${availableBoosts.length})` : ""}
+          </button>
+          {showBoostMenu && (
+            <div className="absolute z-30 top-full mt-2 left-1/2 -translate-x-1/2 glass rounded-2xl p-3 w-72 max-h-72 overflow-y-auto pop-in">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs uppercase tracking-widest text-accent">Your Boosts</span>
+                <button onClick={() => setShowBoostMenu(false)} className="text-xs opacity-70 hover:opacity-100">✕</button>
+              </div>
+              {availableBoosts.length === 0 ? (
+                <p className="text-xs text-muted-foreground py-4 text-center">No boosts available.<br/>Complete levels to earn rewards.</p>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  {availableBoosts.map((b) => {
+                    const def = REWARDS[b.kind];
+                    return (
+                      <button key={b.id} onClick={() => applyBoost(b)}
+                        className="glass rounded-xl p-2 text-left hover:scale-105 transition">
+                        <img src={def.image} alt={def.name} className="rounded-lg w-full mb-1" style={{ aspectRatio: "1/1", objectFit: "cover" }} />
+                        <div className="text-[11px] font-bold leading-tight">{def.name}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              <p className="text-[10px] text-muted-foreground mt-2 text-center">One boost per level</p>
+            </div>
+          )}
+        </div>
         {cfg.timeLimit && (
           <button onClick={() => handleAdAction("plus30")} disabled={adBonus30Used} className="glass rounded-full px-3 py-1.5 text-xs font-semibold disabled:opacity-40">+30 sec{premium ? "" : " (Watch Ad)"}</button>
         )}
         <button onClick={() => handleAdAction("reveal")} disabled={adRevealUsed} className="glass rounded-full px-3 py-1.5 text-xs font-semibold disabled:opacity-40">Reveal{premium ? "" : " (Watch Ad)"}</button>
       </div>
+
+      {boostFeedback && (
+        <div className="text-center text-xs text-accent mt-2 pop-in">{boostFeedback}</div>
+      )}
 
       <div className="flex items-center justify-center p-4">
         <div
@@ -364,31 +413,6 @@ function Play() {
         </div>
       </div>
 
-      {/* Pre-level boost picker */}
-      {showBoostPicker && !activeBoost && (
-        <Modal>
-          <h2 className="text-xl font-black mb-1">Pick a Boost</h2>
-          <p className="text-xs text-muted-foreground mb-4">Use up to one boost for this level (optional).</p>
-          {availableBoosts.length === 0 ? (
-            <p className="text-sm text-muted-foreground mb-4">No boosts available.</p>
-          ) : (
-            <div className="grid grid-cols-2 gap-2 mb-4 max-h-60 overflow-y-auto">
-              {availableBoosts.map((b) => {
-                const def = REWARDS[b.kind];
-                return (
-                  <button key={b.id} onClick={() => { setActiveBoost(b); setShowBoostPicker(false); }}
-                    className="glass rounded-xl p-2 text-left hover:scale-105 transition">
-                    <img src={def.image} alt={def.name} className="rounded-lg w-full mb-1" style={{ aspectRatio: "1/1", objectFit: "cover" }} />
-                    <div className="text-xs font-bold">{def.name}</div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-          <button onClick={() => setShowBoostPicker(false)} className="btn-cosmic w-full !py-2.5">Skip</button>
-        </Modal>
-      )}
-
       {/* Level Failed */}
       {failed && (
         <Modal>
@@ -399,7 +423,7 @@ function Play() {
             {premium ? "Reclaim Time" : "Watch Ad to Reclaim Time"}
           </button>
           <div className="flex gap-2 justify-center">
-            <button className="glass rounded-full px-4 py-2 text-sm font-semibold" onClick={() => resetBoard(false)}>Try Again</button>
+            <button className="glass rounded-full px-4 py-2 text-sm font-semibold" onClick={() => resetBoard()}>Try Again</button>
             <Link to="/levels" className="glass rounded-full px-4 py-2 text-sm font-semibold">Back</Link>
           </div>
         </Modal>
