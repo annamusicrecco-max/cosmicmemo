@@ -8,7 +8,7 @@ function ensure(): HTMLAudioElement | null {
   if (!audio) {
     audio = new Audio("/audio/background-track.mp3");
     audio.loop = true;
-    audio.volume = 0.25;
+    audio.volume = 0.3;
     audio.preload = "auto";
   }
   return audio;
