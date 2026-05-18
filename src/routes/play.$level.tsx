@@ -47,10 +47,11 @@ function Play() {
   const [cardBack, setCardBackUI] = useState<CardBack>("default");
   const [premium, setPremium] = useState(false);
 
-  // Boost selector
-  const [showBoostPicker, setShowBoostPicker] = useState(false);
-  const [activeBoost, setActiveBoost] = useState<InventoryItem | null>(null);
+  // Boost menu
+  const [showBoostMenu, setShowBoostMenu] = useState(false);
+  const [boostUsedThisLevel, setBoostUsedThisLevel] = useState(false);
   const [doubleStreak, setDoubleStreak] = useState(false);
+  const [boostFeedback, setBoostFeedback] = useState<string | null>(null);
 
   // Per-level once flags
   const [extraTimeUsed, setExtraTimeUsed] = useState(false);
@@ -63,6 +64,9 @@ function Play() {
   const [frozenUntil, setFrozenUntil] = useState(0);
   const [peeking, setPeeking] = useState(false);
 
+  // Mute toggle (in-game)
+  const [muted, setMutedState] = useState(false);
+
   // Ad modal state
   const [ad, setAd] = useState<null | "spin" | "plus30" | "reveal" | "reclaim">(null);
 
@@ -71,14 +75,14 @@ function Play() {
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const resetBoard = (preserveBoost = false) => {
+  const resetBoard = () => {
     setDeck(buildDeck(cfg).map((emoji) => ({ emoji, flipped: false, matched: false, mismatch: false })));
     setSelected([]); setMoves(0); setElapsed(0); setTimeLeft(cfg.timeLimit ?? 0);
     setStarted(false); setWon(false); setFailed(false); setReward(null);
     setExtraTimeUsed(false); setFreezeUsed(false); setPeekUsed(false);
     setShuffleUsed(false); setHintUsed(false); setAdBonus30Used(false); setAdRevealUsed(false);
     setConfettiVisible(false);
-    if (!preserveBoost) { setActiveBoost(null); setDoubleStreak(false); }
+    setBoostUsedThisLevel(false); setDoubleStreak(false);
   };
 
   useEffect(() => {
@@ -86,17 +90,17 @@ function Play() {
     setStreak(s.streak);
     setCardBackUI(s.cardBack);
     setPremium(s.premium);
+    setMutedState(s.muted);
 
-    // Check for a pending boost selection from Rewards page
+    // Apply pending boost from Rewards page immediately
     const pendingId = typeof sessionStorage !== "undefined" ? sessionStorage.getItem("pendingBoost") : null;
     const pending = pendingId ? s.inventory.find((i) => i.id === pendingId && !i.usedAt) : null;
     if (pending) {
-      setActiveBoost(pending);
       sessionStorage.removeItem("pendingBoost");
-    } else if (s.inventory.some((i) => !i.usedAt && REWARDS[i.kind].boost)) {
-      setShowBoostPicker(true);
+      // Consume immediately and apply effect after board reset
+      setTimeout(() => applyBoost(pending), 50);
     }
-    resetBoard(true);
+    resetBoard();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [level]);
 
