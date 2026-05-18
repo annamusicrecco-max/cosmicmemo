@@ -23,6 +23,19 @@ function LevelsPage() {
 
   useEffect(() => { setState(loadState()); }, []);
 
+  // Auto-scroll to current level when ready
+  useEffect(() => {
+    if (!state || !scrollerRef.current) return;
+    const target = scrollerRef.current.querySelector<HTMLButtonElement>(`[data-level="${state.highestUnlocked}"]`);
+    if (target && scrollerRef.current) {
+      const el = scrollerRef.current;
+      const offset = target.offsetLeft - el.clientWidth / 2 + target.clientWidth / 2;
+      el.scrollTo({ left: Math.max(0, offset), behavior: "smooth" });
+    }
+  }, [state]);
+
+  const fmtTime = (s: number) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+
   const onPointerDown = (e: React.PointerEvent) => {
     const el = scrollerRef.current; if (!el) return;
     drag.current = { active: true, startX: e.clientX, scrollLeft: el.scrollLeft, moved: 0 };
