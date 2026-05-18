@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Universe } from "@/components/Universe";
+import { DonateModal } from "@/components/DonateModal";
 import { loadState, type GameState } from "@/lib/game-state";
 import { startBackgroundMusic } from "@/lib/audio";
 import logo from "@/assets/logo.png";
@@ -15,13 +16,47 @@ export const Route = createFileRoute("/")({
   }),
 });
 
+type BIPEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
+
 function Welcome() {
   const [state, setState] = useState<GameState | null>(null);
+  const [showDonate, setShowDonate] = useState(false);
+  const [installEvt, setInstallEvt] = useState<BIPEvent | null>(null);
+  const [installed, setInstalled] = useState(false);
+
   useEffect(() => {
     const s = loadState();
     setState(s);
     startBackgroundMusic(s.muted);
+
+    // detect already-installed PWA
+    const standalone = window.matchMedia?.("(display-mode: standalone)").matches
+      || (window.navigator as unknown as { standalone?: boolean }).standalone === true;
+    setInstalled(!!standalone);
+
+    const onBIP = (e: Event) => { e.preventDefault(); setInstallEvt(e as BIPEvent); };
+    const onInstalled = () => { setInstalled(true); setInstallEvt(null); };
+    window.addEventListener("beforeinstallprompt", onBIP);
+    window.addEventListener("appinstalled", onInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onBIP);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
   }, []);
+
+  const onInstall = async () => {
+    if (installed) { alert("✨ Already installed!"); return; }
+    if (!installEvt) {
+      alert("Your browser doesn't support installation, or the app is already installed. Try Chrome/Edge on desktop, or 'Add to Home Screen' on iOS Safari.");
+      return;
+    }
+    try {
+      await installEvt.prompt();
+      const choice = await installEvt.userChoice;
+      if (choice.outcome === "accepted") setInstalled(true);
+      setInstallEvt(null);
+    } catch { /* ignore */ }
+  };
 
   return (
     <main className="relative min-h-screen flex flex-col items-center justify-center px-4 sm:px-6 py-10 text-center overflow-hidden">
@@ -29,13 +64,15 @@ function Welcome() {
       <div className="absolute inset-0 nebula-drift opacity-60 -z-10 pointer-events-none"
         style={{ background: "radial-gradient(circle at 30% 40%, oklch(0.5 0.25 320 / 0.4), transparent 50%), radial-gradient(circle at 70% 60%, oklch(0.5 0.25 200 / 0.35), transparent 55%)" }} />
 
-      {/* Rewards button — top right */}
-      <Link
-        to="/rewards"
-        className="absolute top-4 right-4 sm:top-6 sm:right-6 btn-cosmic !py-2 !px-5 text-sm focus:outline-none focus-visible:ring-4 focus-visible:ring-accent"
-      >
-        Rewards
-      </Link>
+      {/* Top-right utility buttons */}
+      <div className="absolute top-4 right-4 sm:top-6 sm:right-6 flex gap-2">
+        <button onClick={onInstall} className="glass rounded-full px-4 py-2 text-xs sm:text-sm font-semibold hover:scale-105 transition" aria-label="Install app">
+          📲 {installed ? "Installed" : "Install App"}
+        </button>
+        <Link to="/rewards" className="btn-cosmic !py-2 !px-5 text-sm focus:outline-none focus-visible:ring-4 focus-visible:ring-accent">
+          Rewards
+        </Link>
+      </div>
 
       <img
         src={logo}
@@ -67,6 +104,20 @@ function Welcome() {
       >
         Start Journey
       </Link>
+
+      <button
+        onClick={() => setShowDonate(true)}
+        className="mt-4 text-sm font-semibold inline-flex items-center gap-2 px-5 py-2 rounded-full"
+        style={{
+          background: "linear-gradient(135deg, rgba(236,72,153,0.18), rgba(168,85,247,0.18))",
+          border: "1px solid oklch(1 0 0 / 0.15)",
+          color: "#fbcfe8",
+        }}
+      >
+        💜 Donate
+      </button>
+
+      <DonateModal open={showDonate} onClose={() => setShowDonate(false)} />
     </main>
   );
 }
