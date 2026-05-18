@@ -14,6 +14,7 @@ import {
   type CardBack,
 } from "@/lib/game-state";
 import { REWARDS, pickRandomReward, type RewardKind } from "@/lib/rewards";
+import { setMuted as setAudioMuted } from "@/lib/audio";
 
 export const Route = createFileRoute("/play/$level")({
   component: Play,
