@@ -1,3 +1,11 @@
+/* REMINDER: Remove the #lovable-badge rules below after 1-2 hours once the dashboard “Hide badge” setting has propagated. */
+#lovable-badge { display: none; visibility: hidden; opacity: 0; pointer-events: none; }
+a[href="https://lovable.dev/projects/0d171e46-a2ec-4c61-96e7-1a2d79e0c0b6?utm_source=lovable-badge"][target="_blank"] { display: none; }
+a#lovable-badge { display: none; }
+a[href^="https://lovable.dev/projects/0d171e46-a2ec-4c61-96e7-1a2d79e0c0b6"] { display: none; }
+#container #lovable-badge { display: none; }
+/* END REMINDER */
+
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
