@@ -206,14 +206,19 @@ function Play() {
     const prev = s.times[level];
     s.times[level] = prev ? Math.min(prev, elapsed) : elapsed;
 
-    // Earn a random reward and add to inventory
-    const kind = pickRandomReward(level);
-    const item: InventoryItem = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, kind, level, earnedAt: Date.now() };
-    s.inventory.unshift(item);
-
-    saveState(s);
-    setStreak(s.streak);
-    setReward(kind);
+    // 50% chance to earn a reward
+    if (Math.random() < 0.5) {
+      const kind = pickRandomReward(level);
+      const item: InventoryItem = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, kind, level, earnedAt: Date.now() };
+      s.inventory.unshift(item);
+      saveState(s);
+      setStreak(s.streak);
+      setReward(kind);
+    } else {
+      saveState(s);
+      setStreak(s.streak);
+      setReward(null);
+    }
   };
 
   const goNext = () => {
