@@ -118,7 +118,7 @@ function Welcome() {
         Start Journey
       </Link>
 
-      <DonateModal open={showDonate} onClose={() => setShowDonate(false)} />
+      
     </main>
   );
 }
