@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Universe } from "@/components/Universe";
-import { DonateModal } from "@/components/DonateModal";
+
 import { loadState, type GameState } from "@/lib/game-state";
 import { startBackgroundMusic } from "@/lib/audio";
 import logo from "@/assets/logo.png";
