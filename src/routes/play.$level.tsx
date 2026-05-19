@@ -362,46 +362,54 @@ function Play() {
       )}
 
       {/* In-game action bar */}
-      <div className="flex flex-wrap gap-2 justify-center px-4 mt-3 relative">
-        <div className="relative">
-          <button
-            onClick={() => setShowBoostMenu((v) => !v)}
-            disabled={boostUsedThisLevel}
-            className="btn-cosmic !py-2 !px-4 text-xs disabled:opacity-50 inline-flex items-center gap-1"
-          >
-            ⚡ Boost {availableBoosts.length > 0 && !boostUsedThisLevel ? `(${availableBoosts.length})` : ""}
-          </button>
-          {showBoostMenu && (
-            <div className="absolute z-30 top-full mt-2 left-1/2 -translate-x-1/2 glass rounded-2xl p-3 w-72 max-h-72 overflow-y-auto pop-in">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs uppercase tracking-widest text-accent">Your Boosts</span>
-                <button onClick={() => setShowBoostMenu(false)} className="text-xs opacity-70 hover:opacity-100">✕</button>
-              </div>
-              {availableBoosts.length === 0 ? (
-                <p className="text-xs text-muted-foreground py-4 text-center">No boosts available.<br/>Complete levels to earn rewards.</p>
-              ) : (
-                <div className="grid grid-cols-2 gap-2">
-                  {availableBoosts.map((b) => {
-                    const def = REWARDS[b.kind];
-                    return (
-                      <button key={b.id} onClick={() => applyBoost(b)}
-                        className="glass rounded-xl p-2 text-left hover:scale-105 transition">
-                        <img src={def.image} alt={def.name} className="rounded-lg w-full mb-1" style={{ aspectRatio: "1/1", objectFit: "cover" }} />
-                        <div className="text-[11px] font-bold leading-tight">{def.name}</div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-              <p className="text-[10px] text-muted-foreground mt-2 text-center">One boost per level</p>
-            </div>
-          )}
-        </div>
+      <div className="flex flex-wrap gap-2 justify-center px-4 mt-3">
+        <button
+          onClick={() => setShowBoostMenu(true)}
+          disabled={boostUsedThisLevel}
+          className="btn-cosmic !py-2 !px-4 text-xs disabled:opacity-50 inline-flex items-center gap-1"
+        >
+          ⚡ Boost {availableBoosts.length > 0 && !boostUsedThisLevel ? `(${availableBoosts.length})` : ""}
+        </button>
         {cfg.timeLimit && (
           <button onClick={() => handleAdAction("plus30")} disabled={adBonus30Used} className="glass rounded-full px-3 py-1.5 text-xs font-semibold disabled:opacity-40">+30 sec{premium ? "" : " (Watch Ad)"}</button>
         )}
         <button onClick={() => handleAdAction("reveal")} disabled={adRevealUsed} className="glass rounded-full px-3 py-1.5 text-xs font-semibold disabled:opacity-40">Reveal{premium ? "" : " (Watch Ad)"}</button>
       </div>
+
+      {/* Centered boost modal */}
+      {showBoostMenu && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+          onClick={() => setShowBoostMenu(false)}
+        >
+          <div
+            className="glass rounded-3xl p-5 w-[90%] max-w-[400px] max-h-[80vh] overflow-y-auto pop-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-base font-black text-glow">Your Boosts</h3>
+              <button onClick={() => setShowBoostMenu(false)} className="glass rounded-full px-3 py-1 text-xs">Close</button>
+            </div>
+            {availableBoosts.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-6 text-center">No boosts available.<br/>Complete levels to earn rewards.</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                {availableBoosts.map((b) => {
+                  const def = REWARDS[b.kind];
+                  return (
+                    <button key={b.id} onClick={() => applyBoost(b)}
+                      className="glass rounded-xl p-2 text-left hover:scale-105 transition">
+                      <img src={def.image} alt={def.name} className="rounded-lg w-full mb-1" style={{ aspectRatio: "1/1", objectFit: "cover" }} />
+                      <div className="text-[11px] font-bold leading-tight">{def.name}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <p className="text-[11px] text-muted-foreground mt-3 text-center">One boost per level</p>
+          </div>
+        </div>
+      )}
 
       {boostFeedback && (
         <div className="text-center text-xs text-accent mt-2 pop-in">{boostFeedback}</div>
@@ -417,6 +425,24 @@ function Play() {
           ))}
         </div>
       </div>
+
+      {/* Bottom big timer — only when 12 cards or fewer */}
+      {cfg.timeLimit && (cfg.rows * cfg.cols) <= 12 && !won && !failed && (
+        <div className="text-center pb-6 pop-in">
+          <div
+            className="font-black tabular-nums"
+            style={{
+              fontSize: "clamp(24px, 7vw, 32px)",
+              color: timePct <= 30 ? "oklch(0.7 0.25 25)" : "oklch(0.95 0.05 90)",
+              textShadow: timePct <= 30 ? "0 0 18px oklch(0.65 0.25 25 / 0.8)" : "0 0 12px oklch(1 0 0 / 0.3)",
+              letterSpacing: "0.05em",
+            }}
+          >
+            {minSec(timeLeft)}
+          </div>
+        </div>
+      )}
+
 
       {/* Level Failed */}
       {failed && (
