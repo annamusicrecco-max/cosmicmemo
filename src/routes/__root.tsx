@@ -9,6 +9,8 @@ import {
 } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { registerPWA } from "@/lib/pwa";
+import { startBackgroundMusic } from "@/lib/audio";
+import { loadState } from "@/lib/game-state";
 
 import appCss from "../styles.css?url";
 
@@ -123,7 +125,10 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-  useEffect(() => { registerPWA(); }, []);
+  useEffect(() => {
+    registerPWA();
+    try { startBackgroundMusic(loadState().muted); } catch { /* ignore */ }
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
