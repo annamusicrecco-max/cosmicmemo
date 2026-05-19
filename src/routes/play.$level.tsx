@@ -461,19 +461,27 @@ function Play() {
       )}
 
       {/* Level Complete */}
-      {won && reward && !confettiVisible && (
+      {won && !confettiVisible && (
         <Modal>
           <h2 className="text-2xl font-black text-glow mb-1">Level {level} Complete</h2>
           <p className="text-xs text-muted-foreground mb-4">Streak 🔥 {streak} · {moves} moves · {minSec(elapsed)}</p>
 
-          <div className="mb-4">
-            <img src={REWARDS[reward].image} alt={REWARDS[reward].name}
-              className="mx-auto rounded-2xl"
-              style={{ width: "80%", aspectRatio: "1/1", objectFit: "cover" }} />
-            <div className="text-xs uppercase tracking-widest text-accent mt-3">Reward earned</div>
-            <div className="text-lg font-bold">{REWARDS[reward].name}</div>
-            <div className="text-xs text-muted-foreground">{REWARDS[reward].description}</div>
-          </div>
+          {reward ? (
+            <div className="mb-4">
+              <img src={REWARDS[reward].image} alt={REWARDS[reward].name}
+                className="mx-auto rounded-2xl"
+                style={{ width: "80%", aspectRatio: "1/1", objectFit: "cover" }} />
+              <div className="text-xs uppercase tracking-widest text-accent mt-3">Reward earned</div>
+              <div className="text-lg font-bold">{REWARDS[reward].name}</div>
+              <div className="text-xs text-muted-foreground">{REWARDS[reward].description}</div>
+            </div>
+          ) : (
+            <div className="mb-4 py-4">
+              <div className="text-5xl mb-2">🌠</div>
+              <div className="text-base font-bold">No reward this time</div>
+              <div className="text-xs text-muted-foreground mt-1">Keep playing — the cosmos rewards persistence.</div>
+            </div>
+          )}
 
           <button onClick={() => handleAdAction("spin")} className="glass rounded-full w-full py-2 text-sm font-semibold mb-3">
             🎡 {premium ? "Spin Bonus Wheel" : "Watch Ad to Spin"}
