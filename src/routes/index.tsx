@@ -20,7 +20,7 @@ type BIPEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ out
 
 function Welcome() {
   const [state, setState] = useState<GameState | null>(null);
-  const [showDonate, setShowDonate] = useState(false);
+  
   const [installEvt, setInstallEvt] = useState<BIPEvent | null>(null);
   const [installed, setInstalled] = useState(false);
 
