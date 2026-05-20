@@ -580,3 +580,45 @@ function Card({ card, onClick, backStyle }: { card: CardState; onClick: () => vo
     </button>
   );
 }
+
+function BuyBoostsModal({ onClose, onPurchase }: { onClose: () => void; onPurchase: () => void }) {
+  const [processing, setProcessing] = useState(false);
+  const handleBuy = () => {
+    setProcessing(true);
+    setTimeout(() => { setProcessing(false); onPurchase(); }, 1500);
+  };
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md p-4" onClick={onClose}>
+      <div
+        className="rounded-3xl p-7 max-w-md w-full text-center pop-in relative overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "linear-gradient(160deg, oklch(0.25 0.12 290) 0%, oklch(0.18 0.1 320) 100%)",
+          border: "1px solid oklch(1 0 0 / 0.15)",
+          boxShadow: "0 30px 60px -10px rgba(0,0,0,0.6), 0 0 40px rgba(168,85,247,0.35)",
+        }}
+      >
+        <div className="text-5xl mb-3">🛒</div>
+        <h3 className="text-2xl font-black mb-1" style={{ background: "linear-gradient(135deg,#fff,#f0abfc)", WebkitBackgroundClip: "text", color: "transparent" }}>Get More Boosts</h3>
+        <p className="text-sm text-muted-foreground mb-5">Power Pack bundle — instantly added to your inventory.</p>
+        <ul className="text-left space-y-2 mb-6 text-sm">
+          <li className="glass rounded-xl px-3 py-2">❄️ 4 × Freeze Timer</li>
+          <li className="glass rounded-xl px-3 py-2">⏱️ 3 × Extra Time</li>
+          <li className="glass rounded-xl px-3 py-2">👁️ 3 × Reveal Peek</li>
+        </ul>
+        <button
+          onClick={handleBuy}
+          disabled={processing}
+          className="w-full py-3 rounded-full font-black text-white text-base mb-2 disabled:opacity-60"
+          style={{
+            background: "linear-gradient(135deg, #a855f7 0%, #ec4899 50%, #f43f5e 100%)",
+            boxShadow: "0 10px 30px rgba(236,72,153,0.5), inset 0 1px 0 rgba(255,255,255,0.4)",
+          }}
+        >
+          {processing ? "Processing…" : "Purchase $1.00"}
+        </button>
+        <button onClick={onClose} className="text-xs text-muted-foreground underline w-full">Cancel</button>
+      </div>
+    </div>
+  );
+}
