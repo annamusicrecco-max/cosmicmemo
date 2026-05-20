@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { loadState, saveState, resetState, type CardBack } from "@/lib/game-state";
-import { setMuted } from "@/lib/audio";
+import { setMuted, setVolume } from "@/lib/audio";
 import { DonateModal } from "@/components/DonateModal";
 
 export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
