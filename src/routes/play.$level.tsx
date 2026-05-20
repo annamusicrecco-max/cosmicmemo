@@ -485,9 +485,11 @@ function Play() {
 
           {reward ? (
             <div className="mb-4">
-              <img src={REWARDS[reward].image} alt={REWARDS[reward].name}
-                className="mx-auto rounded-2xl"
-                style={{ width: "80%", aspectRatio: "1/1", objectFit: "cover" }} />
+              <div className="shimmer-wrap mx-auto rounded-2xl" style={{ width: "80%", aspectRatio: "1/1" }}>
+                <img src={REWARDS[reward].image} alt={REWARDS[reward].name}
+                  className="rounded-2xl w-full h-full"
+                  style={{ objectFit: "cover", display: "block" }} />
+              </div>
               <div className="text-xs uppercase tracking-widest text-accent mt-3">Reward earned</div>
               <div className="text-lg font-bold">{REWARDS[reward].name}</div>
               <div className="text-xs text-muted-foreground">{REWARDS[reward].description}</div>
