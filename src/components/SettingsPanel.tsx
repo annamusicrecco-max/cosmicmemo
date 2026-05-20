@@ -70,6 +70,19 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
           <Row label={muted ? "Background music muted" : "Background music on"}>
             <button onClick={onToggleMute} className="btn-cosmic !py-2 !px-4 text-sm">{muted ? "Unmute" : "Mute"}</button>
           </Row>
+          <div className="mt-3">
+            <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+              <span>Volume</span>
+              <span className="tabular-nums">{Math.round((muted ? 0 : volume) * 100)}%</span>
+            </div>
+            <input
+              type="range" min={0} max={100} step={1}
+              value={Math.round((muted ? 0 : volume) * 100)}
+              onChange={onVolumeChange}
+              className="w-full accent-accent"
+              aria-label="Music volume"
+            />
+          </div>
         </Section>
 
         <Section title="Premium">
