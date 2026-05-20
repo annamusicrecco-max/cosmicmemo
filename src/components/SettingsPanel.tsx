@@ -5,6 +5,7 @@ import { DonateModal } from "@/components/DonateModal";
 
 export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [muted, setMutedState] = useState(false);
+  const [volume, setVolumeState] = useState(0.2);
   const [premium, setPremium] = useState(false);
   const [cardBack, setCardBack] = useState<CardBack>("default");
   const [showPremium, setShowPremium] = useState(false);
