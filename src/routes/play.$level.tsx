@@ -394,7 +394,21 @@ function Play() {
               <button onClick={() => setShowBoostMenu(false)} className="glass rounded-full px-3 py-1 text-xs">Close</button>
             </div>
             {availableBoosts.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-6 text-center">No boosts available.<br/>Complete levels to earn rewards.</p>
+              <div className="py-6 text-center">
+                <p className="text-sm text-muted-foreground mb-4">No boosts available.<br/>Complete levels to earn rewards.</p>
+                {!premium && (
+                  <button
+                    onClick={() => { setShowBoostMenu(false); setShowBuyBoosts(true); }}
+                    className="w-full py-2.5 rounded-full font-black text-white text-sm"
+                    style={{
+                      background: "linear-gradient(135deg, #a855f7 0%, #ec4899 50%, #f43f5e 100%)",
+                      boxShadow: "0 8px 24px rgba(236,72,153,0.4)",
+                    }}
+                  >
+                    🛒 Buy Boosts
+                  </button>
+                )}
+              </div>
             ) : (
               <div className="grid grid-cols-2 gap-3">
                 {availableBoosts.map((b) => {
