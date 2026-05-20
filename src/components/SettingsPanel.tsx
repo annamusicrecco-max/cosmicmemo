@@ -17,7 +17,7 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
     if (open) {
       setMounted(true);
       const s = loadState();
-      setMutedState(s.muted); setPremium(s.premium); setCardBack(s.cardBack);
+      setMutedState(s.muted); setVolumeState(s.volume ?? 0.2); setPremium(s.premium); setCardBack(s.cardBack);
       requestAnimationFrame(() => setAnimateIn(true));
     } else if (mounted) {
       setAnimateIn(false);
