@@ -71,6 +71,9 @@ function Play() {
   // Ad modal state
   const [ad, setAd] = useState<null | "spin" | "plus30" | "reveal" | "reclaim">(null);
 
+  // Buy Boosts modal (free users only)
+  const [showBuyBoosts, setShowBuyBoosts] = useState(false);
+
   // Failed snapshot for "reclaim time"
   const failedSnapshot = useRef<{ deck: CardState[]; timeLeft: number; moves: number; elapsed: number } | null>(null);
 
