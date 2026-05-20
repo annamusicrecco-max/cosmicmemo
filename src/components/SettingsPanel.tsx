@@ -33,6 +33,11 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
   };
 
   const onToggleMute = () => { const v = !muted; setMutedState(v); setMuted(v); update({ muted: v }); };
+  const onVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = Number(e.target.value) / 100;
+    setVolumeState(v); setVolume(v); update({ volume: v });
+    if (muted && v > 0) { setMutedState(false); setMuted(false); update({ muted: false, volume: v }); }
+  };
   const onConfirmPremium = () => { setPremium(true); update({ premium: true }); setShowPremium(false); };
   const onRestore = () => { const s = loadState(); setPremium(s.premium); alert(s.premium ? "Premium restored!" : "No previous purchase found."); };
   const onReset = () => { if (confirm("Reset all progress? This cannot be undone.")) { resetState(); window.location.href = "/"; } };
