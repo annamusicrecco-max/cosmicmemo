@@ -72,6 +72,7 @@ export type GameState = {
   inventory: InventoryItem[];
   premium: boolean;
   muted: boolean;
+  volume: number;
   cardBack: CardBack;
   times: Record<number, number>;
 };
@@ -84,6 +85,7 @@ export function defaultState(): GameState {
     inventory: [],
     premium: false,
     muted: false,
+    volume: 0.2,
     cardBack: "default",
     times: {},
   };

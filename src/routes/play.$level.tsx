@@ -71,6 +71,9 @@ function Play() {
   // Ad modal state
   const [ad, setAd] = useState<null | "spin" | "plus30" | "reveal" | "reclaim">(null);
 
+  // Buy Boosts modal (free users only)
+  const [showBuyBoosts, setShowBuyBoosts] = useState(false);
+
   // Failed snapshot for "reclaim time"
   const failedSnapshot = useRef<{ deck: CardState[]; timeLeft: number; moves: number; elapsed: number } | null>(null);
 
@@ -391,7 +394,21 @@ function Play() {
               <button onClick={() => setShowBoostMenu(false)} className="glass rounded-full px-3 py-1 text-xs">Close</button>
             </div>
             {availableBoosts.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-6 text-center">No boosts available.<br/>Complete levels to earn rewards.</p>
+              <div className="py-6 text-center">
+                <p className="text-sm text-muted-foreground mb-4">No boosts available.<br/>Complete levels to earn rewards.</p>
+                {!premium && (
+                  <button
+                    onClick={() => { setShowBoostMenu(false); setShowBuyBoosts(true); }}
+                    className="w-full py-2.5 rounded-full font-black text-white text-sm"
+                    style={{
+                      background: "linear-gradient(135deg, #a855f7 0%, #ec4899 50%, #f43f5e 100%)",
+                      boxShadow: "0 8px 24px rgba(236,72,153,0.4)",
+                    }}
+                  >
+                    🛒 Buy Boosts
+                  </button>
+                )}
+              </div>
             ) : (
               <div className="grid grid-cols-2 gap-3">
                 {availableBoosts.map((b) => {
@@ -468,9 +485,11 @@ function Play() {
 
           {reward ? (
             <div className="mb-4">
-              <img src={REWARDS[reward].image} alt={REWARDS[reward].name}
-                className="mx-auto rounded-2xl"
-                style={{ width: "80%", aspectRatio: "1/1", objectFit: "cover" }} />
+              <div className="shimmer-wrap mx-auto rounded-2xl" style={{ width: "80%", aspectRatio: "1/1" }}>
+                <img src={REWARDS[reward].image} alt={REWARDS[reward].name}
+                  className="rounded-2xl w-full h-full"
+                  style={{ objectFit: "cover", display: "block" }} />
+              </div>
               <div className="text-xs uppercase tracking-widest text-accent mt-3">Reward earned</div>
               <div className="text-lg font-bold">{REWARDS[reward].name}</div>
               <div className="text-xs text-muted-foreground">{REWARDS[reward].description}</div>
@@ -496,6 +515,30 @@ function Play() {
 
       <AdModal open={ad !== null} label={ad === "reclaim" ? "Restoring your level…" : "Your reward will unlock shortly"}
         onDone={() => { const k = ad; setAd(null); if (k) runAdReward(k); }} />
+
+      {showBuyBoosts && (
+        <BuyBoostsModal
+          onClose={() => setShowBuyBoosts(false)}
+          onPurchase={() => {
+            const s = loadState();
+            const bundle: RewardKind[] = [
+              "freeze-timer","freeze-timer","freeze-timer","freeze-timer",
+              "extra-time","extra-time","extra-time",
+              "reveal-peek","reveal-peek","reveal-peek",
+            ];
+            bundle.forEach((kind, i) => {
+              s.inventory.unshift({
+                id: `${Date.now()}-buy-${i}-${Math.random().toString(36).slice(2,5)}`,
+                kind, level, earnedAt: Date.now(),
+              });
+            });
+            saveState(s);
+            setShowBuyBoosts(false);
+            setBoostFeedback("✨ 10 boosts added");
+            setTimeout(() => setBoostFeedback(null), 2000);
+          }}
+        />
+      )}
     </main>
   );
 }
@@ -535,5 +578,47 @@ function Card({ card, onClick, backStyle }: { card: CardState; onClick: () => vo
         </div>
       </div>
     </button>
+  );
+}
+
+function BuyBoostsModal({ onClose, onPurchase }: { onClose: () => void; onPurchase: () => void }) {
+  const [processing, setProcessing] = useState(false);
+  const handleBuy = () => {
+    setProcessing(true);
+    setTimeout(() => { setProcessing(false); onPurchase(); }, 1500);
+  };
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md p-4" onClick={onClose}>
+      <div
+        className="rounded-3xl p-7 max-w-md w-full text-center pop-in relative overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "linear-gradient(160deg, oklch(0.25 0.12 290) 0%, oklch(0.18 0.1 320) 100%)",
+          border: "1px solid oklch(1 0 0 / 0.15)",
+          boxShadow: "0 30px 60px -10px rgba(0,0,0,0.6), 0 0 40px rgba(168,85,247,0.35)",
+        }}
+      >
+        <div className="text-5xl mb-3">🛒</div>
+        <h3 className="text-2xl font-black mb-1" style={{ background: "linear-gradient(135deg,#fff,#f0abfc)", WebkitBackgroundClip: "text", color: "transparent" }}>Get More Boosts</h3>
+        <p className="text-sm text-muted-foreground mb-5">Power Pack bundle — instantly added to your inventory.</p>
+        <ul className="text-left space-y-2 mb-6 text-sm">
+          <li className="glass rounded-xl px-3 py-2">❄️ 4 × Freeze Timer</li>
+          <li className="glass rounded-xl px-3 py-2">⏱️ 3 × Extra Time</li>
+          <li className="glass rounded-xl px-3 py-2">👁️ 3 × Reveal Peek</li>
+        </ul>
+        <button
+          onClick={handleBuy}
+          disabled={processing}
+          className="w-full py-3 rounded-full font-black text-white text-base mb-2 disabled:opacity-60"
+          style={{
+            background: "linear-gradient(135deg, #a855f7 0%, #ec4899 50%, #f43f5e 100%)",
+            boxShadow: "0 10px 30px rgba(236,72,153,0.5), inset 0 1px 0 rgba(255,255,255,0.4)",
+          }}
+        >
+          {processing ? "Processing…" : "Purchase $1.00"}
+        </button>
+        <button onClick={onClose} className="text-xs text-muted-foreground underline w-full">Cancel</button>
+      </div>
+    </div>
   );
 }
