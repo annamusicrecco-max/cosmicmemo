@@ -515,6 +515,30 @@ function Play() {
 
       <AdModal open={ad !== null} label={ad === "reclaim" ? "Restoring your level…" : "Your reward will unlock shortly"}
         onDone={() => { const k = ad; setAd(null); if (k) runAdReward(k); }} />
+
+      {showBuyBoosts && (
+        <BuyBoostsModal
+          onClose={() => setShowBuyBoosts(false)}
+          onPurchase={() => {
+            const s = loadState();
+            const bundle: RewardKind[] = [
+              "freeze-timer","freeze-timer","freeze-timer","freeze-timer",
+              "extra-time","extra-time","extra-time",
+              "reveal-peek","reveal-peek","reveal-peek",
+            ];
+            bundle.forEach((kind, i) => {
+              s.inventory.unshift({
+                id: `${Date.now()}-buy-${i}-${Math.random().toString(36).slice(2,5)}`,
+                kind, level, earnedAt: Date.now(),
+              });
+            });
+            saveState(s);
+            setShowBuyBoosts(false);
+            setBoostFeedback("✨ 10 boosts added");
+            setTimeout(() => setBoostFeedback(null), 2000);
+          }}
+        />
+      )}
     </main>
   );
 }
