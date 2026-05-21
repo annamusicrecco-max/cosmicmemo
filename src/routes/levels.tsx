@@ -71,6 +71,16 @@ function LevelsPage() {
       <header className="flex items-center justify-between gap-3 px-4 sm:px-6 pt-3 sm:pt-4 mt-3">
         <Link to="/" className="glass rounded-full px-4 py-2 text-sm sm:text-base font-semibold hover:scale-105 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent">← Home</Link>
         <button
+          onClick={() => setMpOpen(true)}
+          className="rounded-full px-4 py-2 text-sm sm:text-base font-black text-white hover:scale-105 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent inline-flex items-center gap-2"
+          style={{
+            background: "linear-gradient(135deg,#a855f7 0%,#ec4899 100%)",
+            boxShadow: "0 8px 24px rgba(236,72,153,0.45), inset 0 1px 0 rgba(255,255,255,0.35)",
+          }}
+        >
+          👥 Multiplayer
+        </button>
+        <button
           onClick={() => setSettingsOpen(true)}
           className="glass rounded-full px-4 py-2 text-sm sm:text-base font-semibold hover:scale-105 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent inline-flex items-center gap-2"
           aria-label="Settings"
