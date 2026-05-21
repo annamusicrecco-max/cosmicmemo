@@ -259,9 +259,10 @@ function Play() {
     setTimeout(() => setDeck((d) => d.map((c) => ({ ...c, hint: false }))), 1000);
   };
 
-  // Apply a boost (consumes the inventory item immediately, one per level)
+  // Apply a boost. Free users consume an inventory item (one per level).
+  // Premium users have unlimited usage and no per-level lock.
   const applyBoost = (item: InventoryItem) => {
-    if (boostUsedThisLevel) { setBoostFeedback("Only one boost per level"); setTimeout(() => setBoostFeedback(null), 1800); return; }
+    if (!premium && boostUsedThisLevel) { setBoostFeedback("Only one boost per level"); setTimeout(() => setBoostFeedback(null), 1800); return; }
     const def = REWARDS[item.kind];
     const fx = def.boost;
     if (!fx) return;
@@ -271,14 +272,24 @@ function Play() {
     else if (fx === "shuffle-swap") useShuffle();
     else if (fx === "hint-spark") useHint();
     else if (fx === "memory-booster") setDoubleStreak(true);
-    // Consume the inventory item
-    const s = loadState();
-    const found = s.inventory.find((x) => x.id === item.id);
-    if (found && !found.usedAt) { found.usedAt = Date.now(); saveState(s); }
-    setBoostUsedThisLevel(true);
+    // Free users: consume the inventory item. Premium: keep inventory intact (unlimited).
+    if (!premium) {
+      const s = loadState();
+      const found = s.inventory.find((x) => x.id === item.id);
+      if (found && !found.usedAt) { found.usedAt = Date.now(); saveState(s); }
+      setBoostUsedThisLevel(true);
+    }
     setShowBoostMenu(false);
     setBoostFeedback(`✨ ${def.name} activated`);
     setTimeout(() => setBoostFeedback(null), 1800);
+  };
+
+  // Premium per-boost reusability flags reset each apply by zeroing the per-level once flags
+  const applyPremiumBoost = (kind: RewardKind) => {
+    // Reset the per-level once flags so premium can re-use freely
+    setExtraTimeUsed(false); setFreezeUsed(false); setPeekUsed(false);
+    setShuffleUsed(false); setHintUsed(false);
+    applyBoost({ id: `premium-${Date.now()}`, kind, level, earnedAt: Date.now() });
   };
 
   const toggleMute = () => {
