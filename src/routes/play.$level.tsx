@@ -340,6 +340,16 @@ function Play() {
 
   // Available in-game boosts (functional only, exclude level-skipper)
   const availableBoosts = (typeof window !== "undefined" ? loadState().inventory : []).filter((i) => !i.usedAt && REWARDS[i.kind].boost);
+  const premiumBoostKinds: RewardKind[] = ["extra-time", "freeze-timer", "reveal-peek", "shuffle-swap", "hint-spark", "memory-booster"];
+
+  const onBoostButtonClick = () => {
+    if (premium) { setShowBoostMenu(true); return; }
+    if (availableBoosts.length === 0) { setShowGoPremium(true); return; }
+    setShowBoostMenu(true);
+  };
+  const onConfirmGoPremium = () => {
+    const s = loadState(); s.premium = true; saveState(s); setPremium(true); setShowGoPremium(false);
+  };
 
   return (
     <main className="relative min-h-screen overflow-hidden">
