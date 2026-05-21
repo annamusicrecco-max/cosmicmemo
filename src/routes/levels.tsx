@@ -19,6 +19,7 @@ export const Route = createFileRoute("/levels")({
 function LevelsPage() {
   const [state, setState] = useState<GameState | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [mpOpen, setMpOpen] = useState(false);
   const navigate = useNavigate();
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const drag = useRef({ active: false, startX: 0, scrollLeft: 0, moved: 0 });
