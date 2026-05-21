@@ -8,6 +8,7 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { useEffect } from "react";
+import { Toaster } from "@/components/ui/sonner";
 import { registerPWA } from "@/lib/pwa";
 import { startBackgroundMusic } from "@/lib/audio";
 import { loadState } from "@/lib/game-state";
