@@ -79,30 +79,6 @@ function LevelsPage() {
 
       <h1 className="text-center text-3xl sm:text-5xl font-black text-glow mt-4 mb-2">Choose a Level</h1>
 
-      {/* Placeholders for future multiplayer / machine modes. No networking or game logic yet. */}
-      <div className="flex flex-wrap justify-center gap-2 px-4 mb-2">
-        {[
-          { label: "Online Matchmaking", icon: "🌐" },
-          { label: "Offline Turn Play", icon: "🔁" },
-          { label: "Random Bot", icon: "🎲" },
-          { label: "Memory Bot", icon: "🧠" },
-        ].map((m) => (
-          <button
-            key={m.label}
-            onClick={() => alert("Coming soon — available in a future update.")}
-            className="rounded-full px-3 py-1.5 text-xs sm:text-sm font-semibold text-white/90 hover:scale-105 transition"
-            style={{
-              background: "linear-gradient(135deg, oklch(0.45 0.15 290 / 0.55), oklch(0.45 0.18 330 / 0.55))",
-              border: "1px solid oklch(1 0 0 / 0.15)",
-              backdropFilter: "blur(8px)",
-            }}
-            aria-label={`${m.label} (coming soon)`}
-          >
-            {m.icon} {m.label}
-          </button>
-        ))}
-      </div>
-
       <div className="flex-1 flex items-center">
         <div
           ref={scrollerRef}

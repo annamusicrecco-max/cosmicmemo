@@ -127,7 +127,7 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   useEffect(() => {
     registerPWA();
-    try { const s = loadState(); startBackgroundMusic(s.muted, s.volume ?? 0.2); } catch { /* ignore */ }
+    try { startBackgroundMusic(loadState().muted); } catch { /* ignore */ }
   }, []);
 
   return (

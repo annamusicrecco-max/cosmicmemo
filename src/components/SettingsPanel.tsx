@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
 import { loadState, saveState, resetState, type CardBack } from "@/lib/game-state";
-import { setMuted, setVolume } from "@/lib/audio";
+import { setMuted } from "@/lib/audio";
 import { DonateModal } from "@/components/DonateModal";
 
 export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [muted, setMutedState] = useState(false);
-  const [volume, setVolumeState] = useState(0.2);
   const [premium, setPremium] = useState(false);
   const [cardBack, setCardBack] = useState<CardBack>("default");
   const [showPremium, setShowPremium] = useState(false);
@@ -17,7 +16,7 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
     if (open) {
       setMounted(true);
       const s = loadState();
-      setMutedState(s.muted); setVolumeState(s.volume ?? 0.2); setPremium(s.premium); setCardBack(s.cardBack);
+      setMutedState(s.muted); setPremium(s.premium); setCardBack(s.cardBack);
       requestAnimationFrame(() => setAnimateIn(true));
     } else if (mounted) {
       setAnimateIn(false);
@@ -33,11 +32,6 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
   };
 
   const onToggleMute = () => { const v = !muted; setMutedState(v); setMuted(v); update({ muted: v }); };
-  const onVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const v = Number(e.target.value) / 100;
-    setVolumeState(v); setVolume(v); update({ volume: v });
-    if (muted && v > 0) { setMutedState(false); setMuted(false); update({ muted: false, volume: v }); }
-  };
   const onConfirmPremium = () => { setPremium(true); update({ premium: true }); setShowPremium(false); };
   const onRestore = () => { const s = loadState(); setPremium(s.premium); alert(s.premium ? "Premium restored!" : "No previous purchase found."); };
   const onReset = () => { if (confirm("Reset all progress? This cannot be undone.")) { resetState(); window.location.href = "/"; } };
@@ -70,19 +64,6 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
           <Row label={muted ? "Background music muted" : "Background music on"}>
             <button onClick={onToggleMute} className="btn-cosmic !py-2 !px-4 text-sm">{muted ? "Unmute" : "Mute"}</button>
           </Row>
-          <div className="mt-3">
-            <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-              <span>Volume</span>
-              <span className="tabular-nums">{Math.round((muted ? 0 : volume) * 100)}%</span>
-            </div>
-            <input
-              type="range" min={0} max={100} step={1}
-              value={Math.round((muted ? 0 : volume) * 100)}
-              onChange={onVolumeChange}
-              className="w-full accent-accent"
-              aria-label="Music volume"
-            />
-          </div>
         </Section>
 
         <Section title="Premium">
