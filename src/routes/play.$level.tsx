@@ -409,11 +409,22 @@ function Play() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-base font-black text-glow">Your Boosts</h3>
+              <h3 className="text-base font-black text-glow">{premium ? "Premium Boosts" : "Your Boosts"}</h3>
               <button onClick={() => setShowBoostMenu(false)} className="glass rounded-full px-3 py-1 text-xs">Close</button>
             </div>
-            {availableBoosts.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-6 text-center">No boosts available.<br/>Complete levels to earn rewards.</p>
+            {premium ? (
+              <div className="grid grid-cols-2 gap-3">
+                {premiumBoostKinds.map((kind) => {
+                  const def = REWARDS[kind];
+                  return (
+                    <button key={kind} onClick={() => applyPremiumBoost(kind)}
+                      className="glass rounded-xl p-2 text-left hover:scale-105 transition">
+                      <img src={def.image} alt={def.name} className="rounded-lg w-full mb-1" style={{ aspectRatio: "1/1", objectFit: "cover" }} />
+                      <div className="text-[11px] font-bold leading-tight">{def.name}</div>
+                    </button>
+                  );
+                })}
+              </div>
             ) : (
               <div className="grid grid-cols-2 gap-3">
                 {availableBoosts.map((b) => {
@@ -428,10 +439,42 @@ function Play() {
                 })}
               </div>
             )}
-            <p className="text-[11px] text-muted-foreground mt-3 text-center">One boost per level</p>
+            <p className="text-[11px] text-muted-foreground mt-3 text-center">{premium ? "Unlimited usage" : "One boost per level"}</p>
           </div>
         </div>
       )}
+
+      {showGoPremium && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md p-4" onClick={() => setShowGoPremium(false)}>
+          <div
+            className="rounded-3xl p-7 max-w-md w-full text-center pop-in relative overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "linear-gradient(160deg, oklch(0.25 0.12 290) 0%, oklch(0.18 0.1 320) 100%)",
+              border: "1px solid oklch(1 0 0 / 0.15)",
+              boxShadow: "0 30px 60px -10px rgba(0,0,0,0.6), 0 0 40px rgba(168,85,247,0.35)",
+            }}
+          >
+            <div className="text-5xl mb-3">✨</div>
+            <h3 className="text-2xl font-black mb-1" style={{ background: "linear-gradient(135deg,#fff,#f0abfc)", WebkitBackgroundClip: "text", color: "transparent" }}>Out of Boosts</h3>
+            <p className="text-sm text-muted-foreground mb-5">Go Premium for unlimited boosts and no ads.</p>
+            <ul className="text-left space-y-2 mb-6 text-sm">
+              {["♾️ Unlimited boosters", "🚫 No ads — ever", "🎴 Exclusive card backs", "💜 Support indie development"].map((b) => (
+                <li key={b} className="glass rounded-xl px-3 py-2">{b}</li>
+              ))}
+            </ul>
+            <button
+              onClick={onConfirmGoPremium}
+              className="w-full py-3 rounded-full font-black text-white text-base mb-2"
+              style={{ background: "linear-gradient(135deg,#a855f7 0%,#ec4899 50%,#f43f5e 100%)", boxShadow: "0 10px 30px rgba(236,72,153,0.5), inset 0 1px 0 rgba(255,255,255,0.4)" }}
+            >
+              Upgrade Now — $4.99
+            </button>
+            <button onClick={() => setShowGoPremium(false)} className="text-xs text-muted-foreground underline w-full">Not now</button>
+          </div>
+        </div>
+      )}
+
 
       {boostFeedback && (
         <div className="text-center text-xs text-accent mt-2 pop-in">{boostFeedback}</div>
