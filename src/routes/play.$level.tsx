@@ -386,11 +386,11 @@ function Play() {
       {/* In-game action bar */}
       <div className="flex flex-wrap gap-2 justify-center px-4 mt-3">
         <button
-          onClick={() => setShowBoostMenu(true)}
-          disabled={boostUsedThisLevel}
+          onClick={onBoostButtonClick}
+          disabled={!premium && boostUsedThisLevel}
           className="btn-cosmic !py-2 !px-4 text-xs disabled:opacity-50 inline-flex items-center gap-1"
         >
-          ⚡ Boost {availableBoosts.length > 0 && !boostUsedThisLevel ? `(${availableBoosts.length})` : ""}
+          ⚡ Boost {premium ? "(∞)" : (availableBoosts.length > 0 && !boostUsedThisLevel ? `(${availableBoosts.length})` : "")}
         </button>
         {cfg.timeLimit && (
           <button onClick={() => handleAdAction("plus30")} disabled={adBonus30Used} className="glass rounded-full px-3 py-1.5 text-xs font-semibold disabled:opacity-40">+30 sec{premium ? "" : " (Watch Ad)"}</button>
