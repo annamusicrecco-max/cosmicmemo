@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { Universe } from "@/components/Universe";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { loadState, type GameState } from "@/lib/game-state";
@@ -14,9 +15,11 @@ export const Route = createFileRoute("/levels")({
   }),
 });
 
+
 function LevelsPage() {
   const [state, setState] = useState<GameState | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [mpOpen, setMpOpen] = useState(false);
   const navigate = useNavigate();
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const drag = useRef({ active: false, startX: 0, scrollLeft: 0, moved: 0 });
@@ -67,6 +70,16 @@ function LevelsPage() {
 
       <header className="flex items-center justify-between gap-3 px-4 sm:px-6 pt-3 sm:pt-4 mt-3">
         <Link to="/" className="glass rounded-full px-4 py-2 text-sm sm:text-base font-semibold hover:scale-105 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent">← Home</Link>
+        <button
+          onClick={() => setMpOpen(true)}
+          className="rounded-full px-4 py-2 text-sm sm:text-base font-black text-white hover:scale-105 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent inline-flex items-center gap-2"
+          style={{
+            background: "linear-gradient(135deg,#a855f7 0%,#ec4899 100%)",
+            boxShadow: "0 8px 24px rgba(236,72,153,0.45), inset 0 1px 0 rgba(255,255,255,0.35)",
+          }}
+        >
+          👥 Multiplayer
+        </button>
         <button
           onClick={() => setSettingsOpen(true)}
           className="glass rounded-full px-4 py-2 text-sm sm:text-base font-semibold hover:scale-105 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent inline-flex items-center gap-2"
@@ -126,6 +139,52 @@ function LevelsPage() {
       <p className="text-center text-xs text-muted-foreground pb-4">Drag horizontally or swipe to explore all 100 levels</p>
 
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+
+      {mpOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm" onClick={() => setMpOpen(false)}>
+          <div
+            className="rounded-3xl p-6 w-full max-w-md pop-in relative overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "linear-gradient(160deg, oklch(0.25 0.12 290) 0%, oklch(0.18 0.1 320) 100%)",
+              border: "1px solid oklch(1 0 0 / 0.15)",
+              boxShadow: "0 30px 60px -10px rgba(0,0,0,0.6), 0 0 40px rgba(168,85,247,0.35)",
+            }}
+          >
+            <div className="text-center mb-1 text-4xl">👥</div>
+            <h2 className="text-2xl font-black text-center mb-1" style={{ background: "linear-gradient(135deg,#fff,#f0abfc)", WebkitBackgroundClip: "text", color: "transparent" }}>Multiplayer</h2>
+            <p className="text-xs text-muted-foreground text-center mb-5">Choose a mode</p>
+
+            <div className="grid grid-cols-2 gap-3">
+              <MPOption emoji="🌐" label="vs Human" sub="Online" onClick={() => toast("Coming soon ✨")} />
+              <MPOption emoji="🎮" label="vs Human" sub="Offline" highlight onClick={() => { setMpOpen(false); navigate({ to: "/multiplayer" }); }} />
+              <MPOption emoji="🎲" label="vs Bot" sub="Random" onClick={() => toast("Coming soon ✨")} />
+              <MPOption emoji="🧠" label="vs Bot" sub="Memory" onClick={() => toast("Coming soon ✨")} />
+            </div>
+
+            <button onClick={() => setMpOpen(false)} className="glass rounded-full w-full mt-5 py-2 text-sm font-semibold">Close</button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
+
+function MPOption({ emoji, label, sub, highlight, onClick }: { emoji: string; label: string; sub: string; highlight?: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="rounded-2xl p-4 text-center transition hover:scale-105 active:scale-95"
+      style={highlight ? {
+        background: "linear-gradient(135deg,#a855f7,#ec4899)",
+        boxShadow: "0 10px 24px rgba(236,72,153,0.45), inset 0 1px 0 rgba(255,255,255,0.35)",
+        color: "#fff",
+      } : { background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}
+    >
+      <div className="text-3xl mb-1">{emoji}</div>
+      <div className="text-sm font-black leading-tight">{label}</div>
+      <div className="text-[11px] opacity-80">{sub}</div>
+    </button>
+  );
+}
+
