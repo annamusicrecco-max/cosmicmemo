@@ -47,6 +47,7 @@ function Play() {
   const [streak, setStreak] = useState(0);
   const [cardBack, setCardBackUI] = useState<CardBack>("default");
   const [premium, setPremium] = useState(false);
+  const [showGoPremium, setShowGoPremium] = useState(false);
 
   // Boost menu
   const [showBoostMenu, setShowBoostMenu] = useState(false);
