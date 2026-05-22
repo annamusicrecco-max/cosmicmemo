@@ -1,0 +1,326 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Universe } from "@/components/Universe";
+import { Confetti } from "@/components/Confetti";
+import { beep, vibrate } from "@/lib/game-state";
+
+export const Route = createFileRoute("/vs-bot")({
+  component: VsBotPage,
+  head: () => ({
+    meta: [
+      { title: "Play vs Bot — Cosmic Memory" },
+      { name: "description", content: "Challenge a robot opponent in Cosmic Memory. Random play with short-term memory." },
+    ],
+  }),
+});
+
+const EMOJI_POOL = [
+  "🌞","🌙","⭐","🌈","🔥","💧","❄️","🧊","⚡","🌪️",
+  "🐱","🐶","🦊","🐻","🐼","🐨","🐯","🦁","🐸","🐵",
+  "🚀","🛸","🪐","☄️","🌌","🛰️","👽","🤖","🎈","🎁",
+];
+
+type Card = { emoji: string; flipped: boolean; matched: boolean };
+type MemEntry = { emoji: string; pos: number };
+
+function buildDeck(): Card[] {
+  const pool = [...EMOJI_POOL];
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  const chosen = pool.slice(0, 8);
+  const deck = [...chosen, ...chosen].map((e) => ({ emoji: e, flipped: false, matched: false }));
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+  return deck;
+}
+
+function VsBotPage() {
+  const [phase, setPhase] = useState<"name" | "play">("name");
+  const [humanName, setHumanName] = useState("You");
+  const [deck, setDeck] = useState<Card[]>([]);
+  const [selected, setSelected] = useState<number[]>([]);
+  const [turn, setTurn] = useState<0 | 1>(0); // 0 = human, 1 = bot
+  const [scores, setScores] = useState<[number, number]>([0, 0]);
+  const [locked, setLocked] = useState(false);
+  const [confetti, setConfetti] = useState(false);
+  const [botThinking, setBotThinking] = useState(false);
+  const botMem = useRef<MemEntry[]>([]);
+
+  const name = useMemo(() => humanName.trim() || "You", [humanName]);
+  const allMatched = deck.length > 0 && deck.every((c) => c.matched);
+
+  const start = () => {
+    setDeck(buildDeck());
+    setSelected([]); setTurn(0); setScores([0, 0]); setLocked(false);
+    botMem.current = [];
+    setPhase("play");
+  };
+
+  const reset = () => {
+    setDeck(buildDeck());
+    setSelected([]); setTurn(0); setScores([0, 0]); setLocked(false);
+    setConfetti(false);
+    botMem.current = [];
+  };
+
+  useEffect(() => {
+    if (allMatched && !confetti) {
+      beep("win");
+      setConfetti(true);
+      setTimeout(() => setConfetti(false), 2400);
+    }
+  }, [allMatched, confetti]);
+
+  const remember = (entry: MemEntry) => {
+    const mem = botMem.current;
+    if (mem.some((m) => m.pos === entry.pos)) return;
+    mem.push(entry);
+    while (mem.length > 2) mem.shift();
+  };
+  const forgetPositions = (positions: number[]) => {
+    botMem.current = botMem.current.filter((m) => !positions.includes(m.pos));
+  };
+
+  const resolvePair = useCallback((a: number, b: number, byBot: boolean) => {
+    setDeck((d) => {
+      const nd = d.slice();
+      nd[a] = { ...nd[a], flipped: true };
+      nd[b] = { ...nd[b], flipped: true };
+      return nd;
+    });
+    setSelected([a, b]);
+    setLocked(true);
+  }, []);
+
+  useEffect(() => {
+    if (phase !== "play" || allMatched) return;
+    if (turn !== 1) return;
+    if (locked) return;
+
+    let cancelled = false;
+    setBotThinking(true);
+    const delay = 400 + Math.random() * 200;
+
+    const timer = setTimeout(() => {
+      if (cancelled) return;
+      const available: number[] = [];
+      deck.forEach((c, i) => { if (!c.matched) available.push(i); });
+      if (available.length < 2) { setBotThinking(false); return; }
+
+      const mem = botMem.current.filter((m) => !deck[m.pos].matched);
+      botMem.current = mem;
+
+      let a = -1, b = -1;
+      for (let i = 0; i < mem.length; i++) {
+        for (let j = i + 1; j < mem.length; j++) {
+          if (mem[i].emoji === mem[j].emoji) { a = mem[i].pos; b = mem[j].pos; break; }
+        }
+        if (a !== -1) break;
+      }
+
+      if (a === -1 && mem.length >= 1) {
+        const known = mem[0];
+        a = known.pos;
+        const others = available.filter((p) => p !== a);
+        const knownPositions = new Set(mem.map((m) => m.pos));
+        const preferred = others.filter((p) => !knownPositions.has(p));
+        const pool = preferred.length ? preferred : others;
+        b = pool[Math.floor(Math.random() * pool.length)];
+      }
+
+      if (a === -1) {
+        const pool = available.slice();
+        const ai = Math.floor(Math.random() * pool.length);
+        a = pool.splice(ai, 1)[0];
+        const bi = Math.floor(Math.random() * pool.length);
+        b = pool[bi];
+      }
+
+      setBotThinking(false);
+      beep("click");
+      resolvePair(a, b, true);
+    }, delay);
+
+    return () => { cancelled = true; clearTimeout(timer); setBotThinking(false); };
+  }, [turn, phase, allMatched, locked, deck, resolvePair]);
+
+  useEffect(() => {
+    if (selected.length !== 2) return;
+    const [a, b] = selected;
+    const ca = deck[a]; const cb = deck[b];
+    if (!ca || !cb) return;
+    const match = ca.emoji === cb.emoji;
+    const wasBot = turn === 1;
+
+    const t = setTimeout(() => {
+      if (match) {
+        beep("match");
+        setDeck((d) => {
+          const nd = d.slice();
+          nd[a] = { ...nd[a], matched: true };
+          nd[b] = { ...nd[b], matched: true };
+          return nd;
+        });
+        setScores((s) => {
+          const ns: [number, number] = [s[0], s[1]];
+          ns[turn] += 1;
+          return ns;
+        });
+        forgetPositions([a, b]);
+        setSelected([]);
+        setLocked(false);
+      } else {
+        beep("miss"); vibrate(50);
+        setDeck((d) => {
+          const nd = d.slice();
+          nd[a] = { ...nd[a], flipped: false };
+          nd[b] = { ...nd[b], flipped: false };
+          return nd;
+        });
+        remember({ emoji: ca.emoji, pos: a });
+        remember({ emoji: cb.emoji, pos: b });
+        setSelected([]);
+        setTurn((tt) => (tt === 0 ? 1 : 0));
+        setLocked(false);
+      }
+    }, match ? 380 : 750);
+
+    return () => clearTimeout(t);
+  }, [selected, deck, turn]);
+
+  const onHumanFlip = (idx: number) => {
+    if (phase !== "play" || allMatched) return;
+    if (turn !== 0 || locked) return;
+    const c = deck[idx];
+    if (!c || c.flipped || c.matched) return;
+    if (selected.length >= 2) return;
+    beep("click");
+    const next = deck.slice();
+    next[idx] = { ...c, flipped: true };
+    setDeck(next);
+    const sel = [...selected, idx];
+    setSelected(sel);
+    if (sel.length === 2) setLocked(true);
+  };
+
+  const winnerText = () => {
+    if (scores[0] === scores[1]) return `It's a tie! ${scores[0]} – ${scores[1]}`;
+    const humanWins = scores[0] > scores[1];
+    return humanWins
+      ? `${name} wins! Final score: ${scores[0]} – ${scores[1]}`
+      : `Bot wins! Final score: ${scores[1]} – ${scores[0]}`;
+  };
+
+  return (
+    <main className="relative min-h-screen overflow-hidden">
+      <Universe parallax={0.2} />
+      <Confetti active={confetti} />
+
+      <header className="flex items-center justify-between gap-3 px-4 sm:px-6 pt-3 mt-3">
+        <Link to="/levels" className="glass rounded-full px-4 py-2 text-sm font-semibold">← Map</Link>
+        <h1 className="text-lg sm:text-2xl font-black text-glow">vs Bot</h1>
+        <div className="w-16" />
+      </header>
+
+      {phase === "name" && (
+        <div className="flex items-center justify-center p-6">
+          <div className="glass rounded-3xl p-6 w-full max-w-md pop-in">
+            <div className="text-center text-5xl mb-2">🤖</div>
+            <h2 className="text-xl font-black mb-1 text-center">Challenge the Bot</h2>
+            <p className="text-xs text-muted-foreground text-center mb-5">Bot has short-term memory. Outwit it!</p>
+
+            <label className="text-xs uppercase tracking-widest text-accent">Your name</label>
+            <input value={humanName} onChange={(e) => setHumanName(e.target.value.slice(0, 20))}
+              className="w-full mt-1 mb-5 px-4 py-3 rounded-xl bg-background/40 border border-white/15 focus:outline-none focus:border-accent text-sm"
+              placeholder="You" />
+
+            <button onClick={start} className="btn-cosmic w-full !py-3 text-base">Start Game</button>
+          </div>
+        </div>
+      )}
+
+      {phase === "play" && (
+        <>
+          <div className="flex items-center justify-center gap-2 px-4 mt-3 flex-wrap">
+            <PlayerBadge name={name} score={scores[0]} active={turn === 0 && !allMatched} />
+            <span className="text-xs text-muted-foreground">vs</span>
+            <PlayerBadge name="Bot" score={scores[1]} active={turn === 1 && !allMatched} />
+          </div>
+
+          <div className="text-center mt-2 text-sm font-semibold text-accent min-h-[1.25rem]">
+            {allMatched ? "Game Over" : turn === 0 ? "Your turn" : (botThinking ? "Bot is thinking…" : "Bot's turn")}
+          </div>
+
+          <div className="flex items-center justify-center p-4">
+            <div className="grid grid-cols-4 gap-2 sm:gap-3 w-full max-w-[min(90vw,90vh)]">
+              {deck.map((c, i) => (
+                <MPCard key={i} card={c} onClick={() => onHumanFlip(i)} disabled={turn !== 0 || locked} />
+              ))}
+            </div>
+          </div>
+
+          <div className="flex justify-center gap-2 pb-6">
+            <button onClick={reset} className="glass rounded-full px-4 py-2 text-sm font-semibold">Reset Game</button>
+            <Link to="/levels" className="glass rounded-full px-4 py-2 text-sm font-semibold">Back to Map</Link>
+          </div>
+
+          {allMatched && (
+            <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-background/70 backdrop-blur-sm">
+              <div className="glass rounded-3xl p-6 max-w-md w-full text-center pop-in">
+                <div className="text-5xl mb-3">{scores[0] >= scores[1] ? "🏆" : "🤖"}</div>
+                <h2 className="text-2xl font-black text-glow mb-3">{winnerText()}</h2>
+                <div className="flex gap-2 justify-center flex-wrap">
+                  <button className="btn-cosmic !px-5 !py-2.5 text-sm" onClick={() => { reset(); setPhase("name"); }}>Play Again</button>
+                  <Link to="/levels" className="glass rounded-full px-5 py-2.5 text-sm font-semibold">Back to Map</Link>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </main>
+  );
+}
+
+function PlayerBadge({ name, score, active }: { name: string; score: number; active: boolean }) {
+  return (
+    <div
+      className={`rounded-full px-4 py-2 text-sm font-bold transition ${active ? "scale-105" : "opacity-60"}`}
+      style={active ? {
+        background: "linear-gradient(135deg,#a855f7,#ec4899)",
+        boxShadow: "0 0 22px rgba(236,72,153,0.55)",
+        color: "#fff",
+      } : { background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)" }}
+    >
+      {name}: {score}
+    </div>
+  );
+}
+
+function MPCard({ card, onClick, disabled }: { card: Card; onClick: () => void; disabled?: boolean }) {
+  const showFront = card.flipped || card.matched;
+  return (
+    <button
+      onClick={onClick}
+      disabled={card.matched || disabled}
+      className="relative aspect-square w-full rounded-2xl"
+      style={{ perspective: "800px" }}
+      aria-label={showFront ? card.emoji : "hidden card"}
+    >
+      <div className={`absolute inset-0 card-3d rounded-2xl ${showFront ? "flipped" : ""} ${card.matched ? "matched-glow" : ""}`}>
+        <div className="card-face absolute inset-0 rounded-2xl overflow-hidden flex items-center justify-center"
+          style={{ background: "linear-gradient(135deg, oklch(0.55 0.18 290), oklch(0.45 0.18 240))", border: "1px solid oklch(1 0 0 / 0.18)" }}>
+          <span className="text-glow text-2xl">✦</span>
+        </div>
+        <div className="card-face card-back absolute inset-0 rounded-2xl overflow-hidden flex items-center justify-center text-4xl sm:text-5xl"
+          style={{ background: "linear-gradient(135deg, oklch(0.97 0.04 90), oklch(0.92 0.08 320))", color: "oklch(0.15 0 0)", border: "1px solid oklch(1 0 0 / 0.3)" }}>
+          <span>{card.emoji}</span>
+        </div>
+      </div>
+    </button>
+  );
+}
