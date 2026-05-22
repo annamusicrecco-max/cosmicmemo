@@ -158,7 +158,7 @@ function LevelsPage() {
             <div className="grid grid-cols-2 gap-3">
               <MPOption emoji="🌐" label="vs Human" sub="Online" onClick={() => toast("Coming soon ✨")} />
               <MPOption emoji="🎮" label="vs Human" sub="Offline" highlight onClick={() => { setMpOpen(false); navigate({ to: "/multiplayer" }); }} />
-              <MPOption emoji="🎲" label="vs Bot" sub="Random" onClick={() => toast("Coming soon ✨")} />
+              <MPOption emoji="🎲" label="vs Bot" sub="Random" onClick={() => { setMpOpen(false); navigate({ to: "/vs-bot" }); }} />
               <MPOption emoji="🧠" label="vs Bot" sub="Memory" onClick={() => toast("Coming soon ✨")} />
             </div>
 

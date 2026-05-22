@@ -9,12 +9,18 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as VsBotRouteImport } from './routes/vs-bot'
 import { Route as RewardsRouteImport } from './routes/rewards'
 import { Route as MultiplayerRouteImport } from './routes/multiplayer'
 import { Route as LevelsRouteImport } from './routes/levels'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PlayLevelRouteImport } from './routes/play.$level'
 
+const VsBotRoute = VsBotRouteImport.update({
+  id: '/vs-bot',
+  path: '/vs-bot',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RewardsRoute = RewardsRouteImport.update({
   id: '/rewards',
   path: '/rewards',
@@ -46,6 +52,7 @@ export interface FileRoutesByFullPath {
   '/levels': typeof LevelsRoute
   '/multiplayer': typeof MultiplayerRoute
   '/rewards': typeof RewardsRoute
+  '/vs-bot': typeof VsBotRoute
   '/play/$level': typeof PlayLevelRoute
 }
 export interface FileRoutesByTo {
@@ -53,6 +60,7 @@ export interface FileRoutesByTo {
   '/levels': typeof LevelsRoute
   '/multiplayer': typeof MultiplayerRoute
   '/rewards': typeof RewardsRoute
+  '/vs-bot': typeof VsBotRoute
   '/play/$level': typeof PlayLevelRoute
 }
 export interface FileRoutesById {
@@ -61,19 +69,27 @@ export interface FileRoutesById {
   '/levels': typeof LevelsRoute
   '/multiplayer': typeof MultiplayerRoute
   '/rewards': typeof RewardsRoute
+  '/vs-bot': typeof VsBotRoute
   '/play/$level': typeof PlayLevelRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/levels' | '/multiplayer' | '/rewards' | '/play/$level'
+  fullPaths:
+    | '/'
+    | '/levels'
+    | '/multiplayer'
+    | '/rewards'
+    | '/vs-bot'
+    | '/play/$level'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/levels' | '/multiplayer' | '/rewards' | '/play/$level'
+  to: '/' | '/levels' | '/multiplayer' | '/rewards' | '/vs-bot' | '/play/$level'
   id:
     | '__root__'
     | '/'
     | '/levels'
     | '/multiplayer'
     | '/rewards'
+    | '/vs-bot'
     | '/play/$level'
   fileRoutesById: FileRoutesById
 }
@@ -82,11 +98,19 @@ export interface RootRouteChildren {
   LevelsRoute: typeof LevelsRoute
   MultiplayerRoute: typeof MultiplayerRoute
   RewardsRoute: typeof RewardsRoute
+  VsBotRoute: typeof VsBotRoute
   PlayLevelRoute: typeof PlayLevelRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/vs-bot': {
+      id: '/vs-bot'
+      path: '/vs-bot'
+      fullPath: '/vs-bot'
+      preLoaderRoute: typeof VsBotRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/rewards': {
       id: '/rewards'
       path: '/rewards'
@@ -130,6 +154,7 @@ const rootRouteChildren: RootRouteChildren = {
   LevelsRoute: LevelsRoute,
   MultiplayerRoute: MultiplayerRoute,
   RewardsRoute: RewardsRoute,
+  VsBotRoute: VsBotRoute,
   PlayLevelRoute: PlayLevelRoute,
 }
 export const routeTree = rootRouteImport
