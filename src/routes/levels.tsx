@@ -69,13 +69,13 @@ function LevelsPage() {
       <Universe parallax={0.4} />
 
       <header className="flex items-center justify-between gap-3 px-4 sm:px-6 pt-3 sm:pt-4 mt-3">
-        <Link to="/" className="glass rounded-full px-4 py-2 text-sm sm:text-base font-semibold hover:scale-105 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent">← Ho[...]
+        <Link to="/" className="glass rounded-full px-4 py-2 text-sm sm:text-base font-semibold hover:scale-105 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent">← Home</Link>
         <button
           onClick={() => setSettingsOpen(true)}
-          className="glass rounded-full px-4 py-2 text-sm sm:text-base font-semibold hover:scale-105 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent inline-flex items-[...]
+          className="glass rounded-full px-4 py-2 text-sm sm:text-base font-semibold hover:scale-105 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent inline-flex items-center gap-2"
           aria-label="Settings"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19[...]
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m3.08 3.08l4.24 4.24M1 12h6m6 0h6M4.22 19.78l4.24-4.24m3.08-3.08l4.24-4.24" /></svg>
           Settings
         </button>
       </header>
@@ -115,7 +115,7 @@ function LevelsPage() {
                   key={lvl}
                   data-level={lvl}
                   onClick={() => launch(lvl, unlocked)}
-                  className={`shrink-0 w-24 h-32 sm:w-28 sm:h-36 rounded-2xl glass relative flex flex-col items-center justify-center transition-transform hover:scale-110 focus:outline-none focus[...]
+                  className={`shrink-0 w-24 h-32 sm:w-28 sm:h-36 rounded-2xl glass relative flex flex-col items-center justify-center transition-transform hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent ${!unlocked ? "opacity-50 cursor-not-allowed" : ""}`}
                   style={unlocked ? { boxShadow: "0 0 30px oklch(0.72 0.22 320 / 0.45)", border: "1px solid oklch(0.78 0.2 195 / 0.4)" } : {}}
                   aria-label={`Level ${lvl} ${unlocked ? "unlocked" : "locked"}`}
                 >
@@ -155,7 +155,7 @@ function LevelsPage() {
             }}
           >
             <div className="text-center mb-1 text-4xl">👥</div>
-            <h2 className="text-2xl font-black text-center mb-1" style={{ background: "linear-gradient(135deg,#fff,#f0abfc)", WebkitBackgroundClip: "text", color: "transparent" }}>Multiplayer</h2[...]
+            <h2 className="text-2xl font-black text-center mb-1" style={{ background: "linear-gradient(135deg,#fff,#f0abfc)", WebkitBackgroundClip: "text", color: "transparent" }}>Multiplayer</h2>
             <p className="text-xs text-muted-foreground text-center mb-5">Choose a mode</p>
 
             <div className="grid grid-cols-2 gap-3">
