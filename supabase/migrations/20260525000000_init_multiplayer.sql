@@ -1,0 +1,126 @@
+-- Phase 1: Online Multiplayer Database Schema
+-- This migration creates tables and Row Level Security policies for the online matchmaking system.
+
+-- ============================================================================
+-- 1. Create `waiting_players` table
+-- ============================================================================
+-- This table holds players waiting in the matchmaking queue.
+-- When a player joins, they insert a row here. When matched, the row is deleted.
+
+CREATE TABLE public.waiting_players (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  player_id UUID NOT NULL UNIQUE,
+  joined_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Index on joined_at for efficient FIFO matchmaking queries
+CREATE INDEX idx_waiting_players_joined_at ON public.waiting_players(joined_at);
+
+-- ============================================================================
+-- 2. Create `game_rooms` table
+-- ============================================================================
+-- This table stores active game sessions.
+-- The board is stored as JSONB array of card objects.
+-- Structure: [{card: 'emoji', id: number, revealed: boolean, matched: boolean}, ...]
+
+CREATE TABLE public.game_rooms (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  player_1_id UUID NOT NULL,
+  player_2_id UUID NOT NULL,
+  status VARCHAR(50) DEFAULT 'active', -- 'active', 'completed', 'abandoned'
+  current_turn UUID NOT NULL, -- whose turn is it (player_1_id or player_2_id)
+  board JSONB NOT NULL, -- 4x4 grid of card objects
+  player_1_score INT DEFAULT 0,
+  player_2_score INT DEFAULT 0,
+  player_1_moves INT DEFAULT 0,
+  player_2_moves INT DEFAULT 0,
+  winner_id UUID, -- NULL until game ends
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Indexes for efficient queries
+CREATE INDEX idx_game_rooms_player_1_id ON public.game_rooms(player_1_id);
+CREATE INDEX idx_game_rooms_player_2_id ON public.game_rooms(player_2_id);
+CREATE INDEX idx_game_rooms_status ON public.game_rooms(status);
+CREATE INDEX idx_game_rooms_updated_at ON public.game_rooms(updated_at);
+
+-- ============================================================================
+-- 3. Enable Row Level Security (RLS)
+-- ============================================================================
+
+ALTER TABLE public.waiting_players ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.game_rooms ENABLE ROW LEVEL SECURITY;
+
+-- ============================================================================
+-- 4. RLS Policies for `waiting_players`
+-- ============================================================================
+
+-- Players can insert their own record
+CREATE POLICY "Players can insert their own waiting record"
+  ON public.waiting_players
+  FOR INSERT
+  WITH CHECK (player_id = auth.uid());
+
+-- Players can view all waiting players (for status checks)
+CREATE POLICY "Players can view waiting players"
+  ON public.waiting_players
+  FOR SELECT
+  USING (true);
+
+-- Players can delete their own record when matched
+CREATE POLICY "Players can delete their own waiting record"
+  ON public.waiting_players
+  FOR DELETE
+  USING (player_id = auth.uid());
+
+-- ============================================================================
+-- 5. RLS Policies for `game_rooms`
+-- ============================================================================
+
+-- Players can insert game rooms (via Edge Function)
+CREATE POLICY "Anyone can insert game rooms"
+  ON public.game_rooms
+  FOR INSERT
+  WITH CHECK (true);
+
+-- Players can only view their own game rooms
+CREATE POLICY "Players can view their own game rooms"
+  ON public.game_rooms
+  FOR SELECT
+  USING (
+    auth.uid() = player_1_id OR auth.uid() = player_2_id
+  );
+
+-- Players can update their own game rooms
+CREATE POLICY "Players can update their own game rooms"
+  ON public.game_rooms
+  FOR UPDATE
+  USING (
+    auth.uid() = player_1_id OR auth.uid() = player_2_id
+  )
+  WITH CHECK (
+    auth.uid() = player_1_id OR auth.uid() = player_2_id
+  );
+
+-- ============================================================================
+-- 6. Enable Realtime for game_rooms
+-- ============================================================================
+-- This allows real-time updates when game state changes.
+
+ALTER PUBLICATION supabase_realtime ADD TABLE public.game_rooms;
+
+-- Note: waiting_players does NOT need Realtime since matchmaking is
+-- handled by the Edge Function, and players don't need to subscribe to queue changes.
+
+-- ============================================================================
+-- 7. Create initial game board helper (Optional: for documentation)
+-- ============================================================================
+-- The board structure example:
+-- [
+--   {card: "🐱", id: 0, revealed: false, matched: false},
+--   {card: "🐶", id: 1, revealed: false, matched: false},
+--   ...
+-- ]
+-- This will be generated by the Edge Function with a standard emoji deck.
