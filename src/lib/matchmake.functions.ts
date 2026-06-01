@@ -53,7 +53,7 @@ export const joinMatchmaking = createServerFn({ method: "POST" })
           player_1_name,
           player_2_name,
           current_turn: player_1_id,
-          board: board as unknown as object,
+          board: board as never,
           status: "active",
         })
         .select("id")
