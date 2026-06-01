@@ -14,7 +14,78 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      game_rooms: {
+        Row: {
+          board: Json
+          created_at: string
+          current_turn: string
+          id: string
+          player_1_id: string
+          player_1_name: string
+          player_1_score: number
+          player_2_id: string
+          player_2_name: string
+          player_2_score: number
+          revealed: Json
+          status: string
+          updated_at: string
+          winner_id: string | null
+        }
+        Insert: {
+          board: Json
+          created_at?: string
+          current_turn: string
+          id?: string
+          player_1_id: string
+          player_1_name?: string
+          player_1_score?: number
+          player_2_id: string
+          player_2_name?: string
+          player_2_score?: number
+          revealed?: Json
+          status?: string
+          updated_at?: string
+          winner_id?: string | null
+        }
+        Update: {
+          board?: Json
+          created_at?: string
+          current_turn?: string
+          id?: string
+          player_1_id?: string
+          player_1_name?: string
+          player_1_score?: number
+          player_2_id?: string
+          player_2_name?: string
+          player_2_score?: number
+          revealed?: Json
+          status?: string
+          updated_at?: string
+          winner_id?: string | null
+        }
+        Relationships: []
+      }
+      waiting_players: {
+        Row: {
+          id: string
+          joined_at: string
+          player_id: string
+          player_name: string
+        }
+        Insert: {
+          id?: string
+          joined_at?: string
+          player_id: string
+          player_name?: string
+        }
+        Update: {
+          id?: string
+          joined_at?: string
+          player_id?: string
+          player_name?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
