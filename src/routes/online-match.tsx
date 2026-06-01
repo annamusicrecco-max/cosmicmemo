@@ -186,7 +186,7 @@ function OnlineMatchPage() {
             p1Final === p2Final ? null : p1Final > p2Final ? room.player_1_id : room.player_2_id;
         }
         beep("match");
-        await supabase.from("game_rooms").update(updates).eq("id", room.id);
+        await supabase.from("game_rooms").update(updates as never).eq("id", room.id);
       } else {
         beep("miss"); vibrate(50);
         await supabase.from("game_rooms").update({
