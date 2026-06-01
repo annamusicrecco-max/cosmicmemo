@@ -1,220 +1,344 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
-import { useMatchmaking, useGameSync, usePlayerPresence } from "@/hooks/useOnlineGame";
-import { getCurrentUser } from "@/lib/supabase";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Loader2 } from "lucide-react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useEffect, useRef, useState } from "react";
+import { Universe } from "@/components/Universe";
+import { Confetti } from "@/components/Confetti";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  getPlayerId,
+  getPlayerName,
+  setPlayerName,
+  type BoardCard,
+} from "@/lib/online";
+import { joinMatchmaking, leaveMatchmaking } from "@/lib/matchmake.functions";
+import { beep, vibrate } from "@/lib/game-state";
+import { toast } from "sonner";
 
-export function OnlineMatchRoute() {
+export const Route = createFileRoute("/online-match")({
+  component: OnlineMatchPage,
+  head: () => ({
+    meta: [
+      { title: "Online Match — Cosmic Memory" },
+      { name: "description", content: "Play Cosmic Memory online against a random opponent." },
+    ],
+  }),
+});
+
+type GameRoom = {
+  id: string;
+  player_1_id: string;
+  player_2_id: string;
+  player_1_name: string;
+  player_2_name: string;
+  status: string;
+  current_turn: string;
+  board: BoardCard[];
+  revealed: number[];
+  player_1_score: number;
+  player_2_score: number;
+  winner_id: string | null;
+};
+
+type Phase = "name" | "searching" | "playing";
+
+function OnlineMatchPage() {
   const navigate = useNavigate();
-  const { status, gameRoomId, playerNumber, currentTurn, error, joinQueue, cancelQueue } = useMatchmaking();
-  const { gameRoom, loading: gameLoading, updateGameRoom } = useGameSync(gameRoomId);
-  const { opponentOnline } = usePlayerPresence(gameRoomId);
-  const [userId, setUserId] = useState<string | null>(null);
-  const [selectedCards, setSelectedCards] = useState<number[]>([]);
-  const [revealedCards, setRevealedCards] = useState<Set<number>>(new Set());
-  const [matchedCards, setMatchedCards] = useState<Set<number>>(new Set());
+  const join = useServerFn(joinMatchmaking);
+  const leave = useServerFn(leaveMatchmaking);
 
-  // Initialize user and fetch auth
-  useEffect(() => {
-    async function initUser() {
-      const user = await getCurrentUser();
-      if (user) {
-        setUserId(user.id);
-      }
-    }
-    initUser();
-  }, []);
+  const [playerId] = useState(() => getPlayerId());
+  const [name, setName] = useState(() => getPlayerName());
+  const [phase, setPhase] = useState<Phase>(() => (getPlayerName() ? "name" : "name"));
+  const [roomId, setRoomId] = useState<string | null>(null);
+  const [room, setRoom] = useState<GameRoom | null>(null);
+  const [confetti, setConfetti] = useState(false);
 
-  // Join matchmaking queue on mount
-  useEffect(() => {
-    if (userId && status === "idle") {
-      joinQueue();
-    }
-  }, [userId, status, joinQueue]);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-  // Handle card reveal
-  const handleCardClick = (cardIndex: number) => {
-    if (!gameRoom || !userId) return;
-    if (currentTurn !== "your_turn") return;
-    if (matchedCards.has(cardIndex) || revealedCards.has(cardIndex)) return;
+  const clearPolling = () => {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+  };
 
-    const newSelected = [...selectedCards, cardIndex];
-    setSelectedCards(newSelected);
-    setRevealedCards((prev) => new Set(prev).add(cardIndex));
-
-    // If two cards selected, check for match
-    if (newSelected.length === 2) {
-      const [card1Index, card2Index] = newSelected;
-      const card1 = gameRoom.board[card1Index];
-      const card2 = gameRoom.board[card2Index];
-
-      if (card1.card === card2.card) {
-        // Match found!
-        setMatchedCards((prev) => new Set(prev).add(card1Index).add(card2Index));
-        
-        const isPlayer1 = playerNumber === 1;
-        const newScore = isPlayer1
-          ? gameRoom.player_1_score + 1
-          : gameRoom.player_2_score + 1;
-
-        // Update score and switch turn
-        updateGameRoom({
-          board: gameRoom.board.map((c, idx) =>
-            matchedCards.has(idx) || newSelected.includes(idx)
-              ? { ...c, matched: true }
-              : c
-          ),
-          [isPlayer1 ? "player_1_score" : "player_2_score"]: newScore,
-          [isPlayer1 ? "player_1_moves" : "player_2_moves"]:
-            (isPlayer1 ? gameRoom.player_1_moves : gameRoom.player_2_moves) + 1,
-          current_turn: isPlayer1 ? gameRoom.player_2_id : gameRoom.player_1_id,
-        });
-      } else {
-        // No match, flip back after delay
-        setTimeout(() => {
-          setRevealedCards((prev) => {
-            const next = new Set(prev);
-            next.delete(card1Index);
-            next.delete(card2Index);
-            return next;
-          });
-
-          // Switch turn
-          const isPlayer1 = playerNumber === 1;
-          updateGameRoom({
-            [isPlayer1 ? "player_1_moves" : "player_2_moves"]:
-              (isPlayer1 ? gameRoom.player_1_moves : gameRoom.player_2_moves) + 1,
-            current_turn: isPlayer1 ? gameRoom.player_2_id : gameRoom.player_1_id,
-          });
-        }, 1000);
-      }
-
-      setSelectedCards([]);
+  const tryJoin = async () => {
+    const res = await join({ data: { player_id: playerId, player_name: name.trim() || "Player" } });
+    if (res.status === "matched" && "game_room_id" in res) {
+      clearPolling();
+      setRoomId(res.game_room_id);
+      setPhase("playing");
     }
   };
 
-  // Check for game completion
+  // Start searching
+  const startSearch = async () => {
+    if (!name.trim()) { toast("Please enter your name"); return; }
+    setPlayerName(name.trim());
+    setPhase("searching");
+    await tryJoin();
+    // poll every 2s until matched
+    pollRef.current = setInterval(tryJoin, 2000);
+  };
+
+  const cancelSearch = async () => {
+    clearPolling();
+    await leave({ data: { player_id: playerId } });
+    setPhase("name");
+  };
+
+  // Subscribe to room updates
   useEffect(() => {
-    if (gameRoom && matchedCards.size === gameRoom.board.length) {
-      const player1Total = gameRoom.player_1_score;
-      const player2Total = gameRoom.player_2_score;
-      const winnerId = player1Total > player2Total ? gameRoom.player_1_id : gameRoom.player_2_id;
+    if (!roomId) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("game_rooms")
+        .select("*")
+        .eq("id", roomId)
+        .maybeSingle();
+      if (!cancelled && data && !error) setRoom(data as unknown as GameRoom);
+    })();
 
-      updateGameRoom({
-        status: "completed",
-        winner_id: winnerId,
-      });
+    const ch = supabase
+      .channel(`room:${roomId}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "game_rooms", filter: `id=eq.${roomId}` },
+        (payload) => setRoom(payload.new as unknown as GameRoom),
+      )
+      .subscribe();
+    channelRef.current = ch;
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(ch);
+      channelRef.current = null;
+    };
+  }, [roomId]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => { clearPolling(); leave({ data: { player_id: playerId } }).catch(() => {}); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Win confetti
+  useEffect(() => {
+    if (room?.status === "completed" && room.winner_id === playerId && !confetti) {
+      setConfetti(true);
+      beep("win");
+      setTimeout(() => setConfetti(false), 2400);
     }
-  }, [gameRoom, matchedCards.size, updateGameRoom]);
+  }, [room?.status, room?.winner_id, playerId, confetti]);
 
-  // Waiting for match
-  if (status === "waiting") {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-purple-500 via-pink-500 to-red-500">
-        <Card className="w-full max-w-md p-8 text-center shadow-2xl">
-          <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-purple-600" />
-          <h1 className="text-2xl font-bold mb-2">Waiting for opponent...</h1>
-          <p className="text-gray-600 mb-6">Finding a match for you</p>
-          <Button variant="destructive" onClick={cancelQueue} className="w-full">
-            Cancel
-          </Button>
-        </Card>
-      </div>
-    );
-  }
+  const isMyTurn = room && room.current_turn === playerId && room.status === "active";
+  const iAmP1 = room && room.player_1_id === playerId;
+  const myScore = room ? (iAmP1 ? room.player_1_score : room.player_2_score) : 0;
+  const oppScore = room ? (iAmP1 ? room.player_2_score : room.player_1_score) : 0;
+  const myName = room ? (iAmP1 ? room.player_1_name : room.player_2_name) : name;
+  const oppName = room ? (iAmP1 ? room.player_2_name : room.player_1_name) : "Opponent";
 
-  // Error state
-  if (status === "error") {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-purple-500 via-pink-500 to-red-500">
-        <Card className="w-full max-w-md p-8 text-center shadow-2xl">
-          <h1 className="text-2xl font-bold mb-2 text-red-600">Error</h1>
-          <p className="text-gray-600 mb-6">{error}</p>
-          <Button onClick={() => navigate({ to: "/" })} className="w-full">
-            Back to Home
-          </Button>
-        </Card>
-      </div>
-    );
-  }
+  const flip = async (idx: number) => {
+    if (!room || !isMyTurn) return;
+    const board = room.board;
+    const card = board[idx];
+    if (!card || card.matched) return;
+    const revealed = Array.isArray(room.revealed) ? room.revealed : [];
+    if (revealed.includes(idx)) return;
+    if (revealed.length >= 2) return;
 
-  // Game in progress
-  if (status === "matched" && gameRoom && userId) {
-    const isPlayer1 = playerNumber === 1;
-    const currentScore = isPlayer1 ? gameRoom.player_1_score : gameRoom.player_2_score;
-    const opponentScore = isPlayer1 ? gameRoom.player_2_score : gameRoom.player_1_score;
-    const isYourTurn = currentTurn === "your_turn";
+    beep("click");
+    const newRevealed = [...revealed, idx];
 
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-500 via-pink-500 to-red-500 p-4">
-        <div className="max-w-2xl mx-auto">
-          {/* Header */}
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-white mb-2">Cosmic Memory Online</h1>
-            <p className={`text-lg ${opponentOnline ? "text-green-300" : "text-red-300"}`}>
-              Opponent {opponentOnline ? "Online" : "Offline"}
+    if (newRevealed.length === 1) {
+      await supabase.from("game_rooms").update({
+        revealed: newRevealed as never,
+        updated_at: new Date().toISOString(),
+      }).eq("id", room.id);
+      return;
+    }
+
+    // Second flip — resolve match/miss
+    const [a, b] = newRevealed;
+    const isMatch = board[a].emoji === board[b].emoji;
+
+    // Show both for a moment
+    await supabase.from("game_rooms").update({
+      revealed: newRevealed as never,
+      updated_at: new Date().toISOString(),
+    }).eq("id", room.id);
+
+    setTimeout(async () => {
+      if (isMatch) {
+        const newBoard = board.map((c, i) => (i === a || i === b ? { ...c, matched: true } : c));
+        const allMatched = newBoard.every((c) => c.matched);
+        const newMy = (iAmP1 ? room.player_1_score : room.player_2_score) + 1;
+        const updates: Record<string, unknown> = {
+          board: newBoard,
+          revealed: [],
+          [iAmP1 ? "player_1_score" : "player_2_score"]: newMy,
+          updated_at: new Date().toISOString(),
+        };
+        if (allMatched) {
+          const p1Final = iAmP1 ? newMy : room.player_1_score;
+          const p2Final = iAmP1 ? room.player_2_score : newMy;
+          updates.status = "completed";
+          updates.winner_id =
+            p1Final === p2Final ? null : p1Final > p2Final ? room.player_1_id : room.player_2_id;
+        }
+        beep("match");
+        await supabase.from("game_rooms").update(updates as never).eq("id", room.id);
+      } else {
+        beep("miss"); vibrate(50);
+        await supabase.from("game_rooms").update({
+          revealed: [],
+          current_turn: iAmP1 ? room.player_2_id : room.player_1_id,
+          updated_at: new Date().toISOString(),
+        }).eq("id", room.id);
+      }
+    }, 900);
+  };
+
+  const exit = async () => {
+    if (room && room.status === "active") {
+      await supabase.from("game_rooms").update({
+        status: "abandoned",
+        winner_id: iAmP1 ? room.player_2_id : room.player_1_id,
+      }).eq("id", room.id);
+    }
+    navigate({ to: "/levels" });
+  };
+
+  return (
+    <main className="relative min-h-screen overflow-hidden">
+      <Universe parallax={0.2} />
+      <Confetti active={confetti} />
+
+      <header className="flex items-center justify-between gap-3 px-4 sm:px-6 pt-3 mt-3">
+        <Link to="/levels" className="glass rounded-full px-4 py-2 text-sm font-semibold">← Map</Link>
+        <h1 className="text-lg sm:text-2xl font-black text-glow">Online Match</h1>
+        <div className="w-16" />
+      </header>
+
+      {phase === "name" && (
+        <div className="flex items-center justify-center p-6">
+          <div className="glass rounded-3xl p-6 w-full max-w-md pop-in">
+            <h2 className="text-xl font-black mb-1 text-center">Find an Opponent</h2>
+            <p className="text-xs text-muted-foreground text-center mb-5">
+              Choose a name, then we'll match you with a random player.
             </p>
+            <label className="text-xs uppercase tracking-widest text-accent">Your Name</label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value.slice(0, 20))}
+              className="w-full mt-1 mb-5 px-4 py-3 rounded-xl bg-background/40 border border-white/15 focus:outline-none focus:border-accent text-sm"
+              placeholder="Cosmic Player"
+              autoFocus
+            />
+            <button onClick={startSearch} className="btn-cosmic w-full !py-3 text-base">
+              🔭 Find Match
+            </button>
           </div>
-
-          {/* Score & Turn Info */}
-          <div className="grid grid-cols-2 gap-4 mb-8">
-            <Card className={`p-4 text-center ${isPlayer1 ? "bg-blue-100 border-blue-400" : ""}`}>
-              <p className="text-sm text-gray-600">You</p>
-              <p className="text-3xl font-bold text-blue-600">{currentScore}</p>
-            </Card>
-            <Card className={`p-4 text-center ${!isPlayer1 ? "bg-pink-100 border-pink-400" : ""}`}>
-              <p className="text-sm text-gray-600">Opponent</p>
-              <p className="text-3xl font-bold text-pink-600">{opponentScore}</p>
-            </Card>
-          </div>
-
-          {/* Turn Indicator */}
-          <div className="mb-8">
-            <p className={`text-center font-bold text-lg ${isYourTurn ? "text-green-300" : "text-yellow-300"}`}>
-              {isYourTurn ? "Your Turn" : "Opponent's Turn"}
-            </p>
-          </div>
-
-          {/* Game Board */}
-          <div className="grid grid-cols-4 gap-3 mb-8 bg-white/10 p-6 rounded-lg backdrop-blur">
-            {gameRoom.board.map((card, index) => (
-              <button
-                key={index}
-                onClick={() => handleCardClick(index)}
-                disabled={!isYourTurn || gameRoom.status === "completed"}
-                className={`aspect-square rounded-lg font-bold text-2xl transition-all transform ${
-                  matchedCards.has(index)
-                    ? "bg-green-500 text-white scale-95"
-                    : revealedCards.has(index)
-                    ? "bg-yellow-400 text-white scale-110"
-                    : "bg-gradient-to-br from-purple-400 to-pink-400 hover:scale-105 cursor-pointer"
-                } ${!isYourTurn || gameRoom.status === "completed" ? "opacity-75" : ""}`}
-              >
-                {matchedCards.has(index) || revealedCards.has(index) ? card.card : "?"}
-              </button>
-            ))}
-          </div>
-
-          {/* Game Over */}
-          {gameRoom.status === "completed" && (
-            <Card className="p-6 text-center bg-white shadow-xl">
-              <h2 className="text-2xl font-bold mb-4">
-                {gameRoom.winner_id === userId ? "🎉 You Won!" : "😔 You Lost"}
-              </h2>
-              <p className="text-gray-600 mb-6">
-                Final Score - You: {currentScore}, Opponent: {opponentScore}
-              </p>
-              <Button onClick={() => navigate({ to: "/" })} className="w-full">
-                Back to Home
-              </Button>
-            </Card>
-          )}
         </div>
-      </div>
-    );
-  }
+      )}
 
-  return null;
+      {phase === "searching" && (
+        <div className="flex items-center justify-center p-6">
+          <div className="glass rounded-3xl p-8 w-full max-w-md pop-in text-center">
+            <div className="text-5xl mb-3 animate-pulse">🛰️</div>
+            <h2 className="text-xl font-black mb-1">Searching the cosmos…</h2>
+            <p className="text-xs text-muted-foreground mb-5">Waiting for another explorer to join.</p>
+            <button onClick={cancelSearch} className="glass rounded-full px-5 py-2.5 text-sm font-semibold">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {phase === "playing" && room && (
+        <>
+          <div className="flex items-center justify-center gap-2 px-4 mt-3 flex-wrap">
+            <PlayerBadge name={`${myName} (You)`} score={myScore} active={!!isMyTurn} />
+            <span className="text-xs text-muted-foreground">vs</span>
+            <PlayerBadge name={oppName} score={oppScore} active={!isMyTurn && room.status === "active"} />
+          </div>
+
+          <div className="text-center mt-2 text-sm font-semibold text-accent">
+            {room.status === "completed"
+              ? room.winner_id === playerId
+                ? "🏆 You win!"
+                : room.winner_id === null
+                  ? "It's a tie!"
+                  : `${oppName} wins`
+              : room.status === "abandoned"
+                ? "Opponent left — you win"
+                : isMyTurn
+                  ? "Your turn"
+                  : `${oppName}'s turn`}
+          </div>
+
+          <div className="flex items-center justify-center p-4">
+            <div className="grid grid-cols-4 gap-2 sm:gap-3 w-full max-w-[min(90vw,90vh)]">
+              {room.board.map((c, i) => {
+                const revealed = (Array.isArray(room.revealed) ? room.revealed : []).includes(i);
+                const showFront = revealed || c.matched;
+                return (
+                  <button
+                    key={i}
+                    onClick={() => flip(i)}
+                    disabled={!isMyTurn || c.matched || revealed}
+                    className="relative aspect-square w-full rounded-2xl"
+                    style={{ perspective: "800px" }}
+                  >
+                    <div className={`absolute inset-0 card-3d rounded-2xl ${showFront ? "flipped" : ""} ${c.matched ? "matched-glow" : ""}`}>
+                      <div className="card-face absolute inset-0 rounded-2xl overflow-hidden flex items-center justify-center"
+                        style={{ background: "linear-gradient(135deg, oklch(0.55 0.18 290), oklch(0.45 0.18 240))", border: "1px solid oklch(1 0 0 / 0.18)" }}>
+                        <span className="text-glow text-2xl">✦</span>
+                      </div>
+                      <div className="card-face card-back absolute inset-0 rounded-2xl overflow-hidden flex items-center justify-center text-4xl sm:text-5xl"
+                        style={{ background: "linear-gradient(135deg, oklch(0.97 0.04 90), oklch(0.92 0.08 320))", color: "oklch(0.15 0 0)", border: "1px solid oklch(1 0 0 / 0.3)" }}>
+                        <span>{c.emoji}</span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex justify-center gap-2 pb-6">
+            {room.status !== "active" ? (
+              <>
+                <button
+                  className="btn-cosmic !px-5 !py-2.5 text-sm"
+                  onClick={() => { setRoom(null); setRoomId(null); setPhase("name"); }}
+                >
+                  Play Again
+                </button>
+                <Link to="/levels" className="glass rounded-full px-5 py-2.5 text-sm font-semibold">Back to Map</Link>
+              </>
+            ) : (
+              <button onClick={exit} className="glass rounded-full px-5 py-2.5 text-sm font-semibold">
+                Leave Match
+              </button>
+            )}
+          </div>
+        </>
+      )}
+    </main>
+  );
+}
+
+function PlayerBadge({ name, score, active }: { name: string; score: number; active: boolean }) {
+  return (
+    <div
+      className={`rounded-full px-4 py-2 text-sm font-bold transition ${active ? "scale-105" : "opacity-60"}`}
+      style={active ? {
+        background: "linear-gradient(135deg,#a855f7,#ec4899)",
+        boxShadow: "0 0 22px rgba(236,72,153,0.55)",
+        color: "#fff",
+      } : { background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)" }}
+    >
+      {name}: {score}
+    </div>
+  );
 }
