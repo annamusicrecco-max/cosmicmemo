@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VsBotRouteImport } from './routes/vs-bot'
+import { Route as VsAiRouteImport } from './routes/vs-ai'
 import { Route as RewardsRouteImport } from './routes/rewards'
 import { Route as OnlineMatchRouteImport } from './routes/online-match'
 import { Route as MultiplayerRouteImport } from './routes/multiplayer'
@@ -20,6 +21,11 @@ import { Route as PlayLevelRouteImport } from './routes/play.$level'
 const VsBotRoute = VsBotRouteImport.update({
   id: '/vs-bot',
   path: '/vs-bot',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VsAiRoute = VsAiRouteImport.update({
+  id: '/vs-ai',
+  path: '/vs-ai',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RewardsRoute = RewardsRouteImport.update({
@@ -59,6 +65,7 @@ export interface FileRoutesByFullPath {
   '/multiplayer': typeof MultiplayerRoute
   '/online-match': typeof OnlineMatchRoute
   '/rewards': typeof RewardsRoute
+  '/vs-ai': typeof VsAiRoute
   '/vs-bot': typeof VsBotRoute
   '/play/$level': typeof PlayLevelRoute
 }
@@ -68,6 +75,7 @@ export interface FileRoutesByTo {
   '/multiplayer': typeof MultiplayerRoute
   '/online-match': typeof OnlineMatchRoute
   '/rewards': typeof RewardsRoute
+  '/vs-ai': typeof VsAiRoute
   '/vs-bot': typeof VsBotRoute
   '/play/$level': typeof PlayLevelRoute
 }
@@ -78,6 +86,7 @@ export interface FileRoutesById {
   '/multiplayer': typeof MultiplayerRoute
   '/online-match': typeof OnlineMatchRoute
   '/rewards': typeof RewardsRoute
+  '/vs-ai': typeof VsAiRoute
   '/vs-bot': typeof VsBotRoute
   '/play/$level': typeof PlayLevelRoute
 }
@@ -89,6 +98,7 @@ export interface FileRouteTypes {
     | '/multiplayer'
     | '/online-match'
     | '/rewards'
+    | '/vs-ai'
     | '/vs-bot'
     | '/play/$level'
   fileRoutesByTo: FileRoutesByTo
@@ -98,6 +108,7 @@ export interface FileRouteTypes {
     | '/multiplayer'
     | '/online-match'
     | '/rewards'
+    | '/vs-ai'
     | '/vs-bot'
     | '/play/$level'
   id:
@@ -107,6 +118,7 @@ export interface FileRouteTypes {
     | '/multiplayer'
     | '/online-match'
     | '/rewards'
+    | '/vs-ai'
     | '/vs-bot'
     | '/play/$level'
   fileRoutesById: FileRoutesById
@@ -117,6 +129,7 @@ export interface RootRouteChildren {
   MultiplayerRoute: typeof MultiplayerRoute
   OnlineMatchRoute: typeof OnlineMatchRoute
   RewardsRoute: typeof RewardsRoute
+  VsAiRoute: typeof VsAiRoute
   VsBotRoute: typeof VsBotRoute
   PlayLevelRoute: typeof PlayLevelRoute
 }
@@ -128,6 +141,13 @@ declare module '@tanstack/react-router' {
       path: '/vs-bot'
       fullPath: '/vs-bot'
       preLoaderRoute: typeof VsBotRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vs-ai': {
+      id: '/vs-ai'
+      path: '/vs-ai'
+      fullPath: '/vs-ai'
+      preLoaderRoute: typeof VsAiRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/rewards': {
@@ -181,6 +201,7 @@ const rootRouteChildren: RootRouteChildren = {
   MultiplayerRoute: MultiplayerRoute,
   OnlineMatchRoute: OnlineMatchRoute,
   RewardsRoute: RewardsRoute,
+  VsAiRoute: VsAiRoute,
   VsBotRoute: VsBotRoute,
   PlayLevelRoute: PlayLevelRoute,
 }
