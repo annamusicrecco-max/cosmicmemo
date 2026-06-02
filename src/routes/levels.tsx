@@ -162,7 +162,7 @@ function LevelsPage() {
               <MPOption emoji="🌐" label="vs Human" sub="Online" highlight onClick={() => { setMpOpen(false); navigate({ to: "/online-match" }); }} />
               <MPOption emoji="🎮" label="vs Human" sub="Offline" highlight onClick={() => { setMpOpen(false); navigate({ to: "/multiplayer" }); }} />
               <MPOption emoji="🎲" label="vs Bot" sub="Random" onClick={() => { setMpOpen(false); navigate({ to: "/vs-bot" }); }} />
-              <MPOption emoji="🧠" label="vs Bot" sub="Memory" onClick={() => toast("Coming soon ✨")} />
+              <MPOption emoji="🧠" label="vs AI" sub="Smart" highlight onClick={() => { setMpOpen(false); navigate({ to: "/vs-ai" }); }} />
             </div>
 
             <button onClick={() => setMpOpen(false)} className="glass rounded-full w-full mt-5 py-2 text-sm font-semibold">Close</button>
