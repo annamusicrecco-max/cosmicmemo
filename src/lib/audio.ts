@@ -1,5 +1,6 @@
 // Global background music — one element, persists across route changes.
-// Stops only when: user mutes via Settings, or the app/tab closes.
+// Pauses when: user mutes via Settings, OR the tab/app is hidden (user leaves).
+// Resumes automatically when the tab becomes visible again.
 
 let audio: HTMLAudioElement | null = null;
 let started = false;
@@ -18,9 +19,15 @@ function ensure(): HTMLAudioElement | null {
   return audio;
 }
 
+function shouldPlay() {
+  if (userMuted) return false;
+  if (typeof document !== "undefined" && document.hidden) return false;
+  return true;
+}
+
 function tryPlay() {
   const a = audio;
-  if (!a || userMuted) return;
+  if (!a || !shouldPlay()) return;
   const p = a.play();
   if (p && typeof p.catch === "function") p.catch(() => { /* gesture needed */ });
 }
@@ -34,21 +41,27 @@ export function startBackgroundMusic(muted: boolean) {
   if (!started) {
     started = true;
 
-    // Resume on first user gesture (autoplay policy).
     const onGesture = () => { tryPlay(); };
     window.addEventListener("pointerdown", onGesture);
     window.addEventListener("keydown", onGesture);
     window.addEventListener("touchstart", onGesture, { passive: true });
 
-    // Resume when tab becomes visible again.
+    // Pause when user leaves the app/tab, resume when they return.
     document.addEventListener("visibilitychange", () => {
-      if (!document.hidden) tryPlay();
+      if (document.hidden) {
+        if (audio && !audio.paused) audio.pause();
+      } else {
+        tryPlay();
+      }
     });
+    window.addEventListener("blur", () => {
+      if (audio && !audio.paused) audio.pause();
+    });
+    window.addEventListener("focus", () => { tryPlay(); });
 
-    // Watchdog: if music gets paused by something (route change, focus loss),
-    // restart it unless the user muted it.
+    // Watchdog: keep music alive across route changes when the user is here.
     watchdog = setInterval(() => {
-      if (audio && !userMuted && audio.paused) tryPlay();
+      if (audio && shouldPlay() && audio.paused) tryPlay();
     }, 1500);
   }
 
@@ -67,5 +80,4 @@ export function setMuted(muted: boolean) {
   }
 }
 
-// Prevent unused-variable lint while keeping handle available.
 export function _stopWatchdog() { if (watchdog) { clearInterval(watchdog); watchdog = null; } }
