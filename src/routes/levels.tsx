@@ -159,10 +159,10 @@ function LevelsPage() {
             <p className="text-xs text-muted-foreground text-center mb-5">Choose a mode</p>
 
             <div className="grid grid-cols-2 gap-3">
-              <MPOption emoji="🌐" label="vs Human" sub="Online" highlight onClick={() => { setMpOpen(false); navigate({ to: "/online-match" }); }} />
-              <MPOption emoji="🎮" label="vs Human" sub="Offline" highlight onClick={() => { setMpOpen(false); navigate({ to: "/multiplayer" }); }} />
+              <MPOption emoji="🌐" label="vs Human" sub="Online" onClick={() => { setMpOpen(false); navigate({ to: "/online-match" }); }} />
+              <MPOption emoji="🎮" label="vs Human" sub="Offline" onClick={() => { setMpOpen(false); navigate({ to: "/multiplayer" }); }} />
               <MPOption emoji="🎲" label="vs Bot" sub="Random" onClick={() => { setMpOpen(false); navigate({ to: "/vs-bot" }); }} />
-              <MPOption emoji="🧠" label="vs AI" sub="Smart" highlight onClick={() => { setMpOpen(false); navigate({ to: "/vs-ai" }); }} />
+              <MPOption emoji="🧠" label="vs AI" sub="Smart" onClick={() => { setMpOpen(false); navigate({ to: "/vs-ai" }); }} />
             </div>
 
             <button onClick={() => setMpOpen(false)} className="glass rounded-full w-full mt-5 py-2 text-sm font-semibold">Close</button>
@@ -173,16 +173,16 @@ function LevelsPage() {
   );
 }
 
-function MPOption({ emoji, label, sub, highlight, onClick }: { emoji: string; label: string; sub: string; highlight?: boolean; onClick: () => void }) {
+function MPOption({ emoji, label, sub, onClick }: { emoji: string; label: string; sub: string; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
       className="rounded-2xl p-4 text-center transition hover:scale-105 active:scale-95"
-      style={highlight ? {
+      style={{
         background: "linear-gradient(135deg,#a855f7,#ec4899)",
         boxShadow: "0 10px 24px rgba(236,72,153,0.45), inset 0 1px 0 rgba(255,255,255,0.35)",
         color: "#fff",
-      } : { background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}
+      }}
     >
       <div className="text-3xl mb-1">{emoji}</div>
       <div className="text-sm font-black leading-tight">{label}</div>
