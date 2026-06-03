@@ -3,15 +3,23 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { buildBoard } from "./online";
 
+const GRID_LABELS = ["2x2", "2x3", "3x4", "4x4", "4x5", "5x6", "6x6"] as const;
+
 const JoinSchema = z.object({
   player_id: z.string().min(4).max(64),
   player_name: z.string().min(1).max(20),
+  preferred_grid: z.enum(GRID_LABELS).default("4x4"),
 });
+
+function totalForLabel(label: string): number {
+  const [r, c] = label.split("x").map((n) => parseInt(n, 10));
+  return (r || 4) * (c || 4);
+}
 
 export const joinMatchmaking = createServerFn({ method: "POST" })
   .inputValidator((input) => JoinSchema.parse(input))
   .handler(async ({ data }) => {
-    const { player_id, player_name } = data;
+    const { player_id, player_name, preferred_grid } = data;
 
     // 1. If this player is already in an active game, return that room
     const { data: existingRoom } = await supabaseAdmin
@@ -29,13 +37,22 @@ export const joinMatchmaking = createServerFn({ method: "POST" })
     // 2. Look for another waiting player (not this one)
     const { data: others } = await supabaseAdmin
       .from("waiting_players")
-      .select("player_id, player_name")
+      .select("player_id, player_name, preferred_grid")
       .neq("player_id", player_id)
       .order("joined_at", { ascending: true })
       .limit(1);
 
     if (others && others.length > 0) {
-      const opponent = others[0];
+      const opponent = others[0] as { player_id: string; player_name: string; preferred_grid: string };
+      const oppGrid = opponent.preferred_grid || "4x4";
+      // Choose grid: same → that; different → random pick of the two
+      const grid_size =
+        oppGrid === preferred_grid
+          ? preferred_grid
+          : Math.random() < 0.5
+            ? preferred_grid
+            : oppGrid;
+
       // Coin flip for who goes first
       const p1First = Math.random() < 0.5;
       const player_1_id = p1First ? player_id : opponent.player_id;
@@ -43,7 +60,7 @@ export const joinMatchmaking = createServerFn({ method: "POST" })
       const player_1_name = p1First ? player_name : opponent.player_name;
       const player_2_name = p1First ? opponent.player_name : player_name;
 
-      const board = buildBoard();
+      const board = buildBoard(totalForLabel(grid_size));
 
       const { data: room, error: roomErr } = await supabaseAdmin
         .from("game_rooms")
@@ -55,6 +72,7 @@ export const joinMatchmaking = createServerFn({ method: "POST" })
           current_turn: player_1_id,
           board: board as never,
           status: "active",
+          grid_size,
         })
         .select("id")
         .single();
@@ -73,7 +91,7 @@ export const joinMatchmaking = createServerFn({ method: "POST" })
     await supabaseAdmin
       .from("waiting_players")
       .upsert(
-        { player_id, player_name, joined_at: new Date().toISOString() },
+        { player_id, player_name, preferred_grid, joined_at: new Date().toISOString() },
         { onConflict: "player_id" }
       );
 
