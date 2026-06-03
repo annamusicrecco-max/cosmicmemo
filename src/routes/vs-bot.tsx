@@ -57,15 +57,17 @@ function VsBotPage() {
   const name = useMemo(() => humanName.trim() || "You", [humanName]);
   const allMatched = deck.length > 0 && deck.every((c) => c.matched);
 
+  const grid = useMemo(() => getGrid(gridLabel), [gridLabel]);
+
   const start = () => {
-    setDeck(buildDeck());
+    setDeck(buildDeck(grid.total));
     setSelected([]); setTurn(0); setScores([0, 0]); setLocked(false);
     botMem.current = [];
     setPhase("play");
   };
 
   const reset = () => {
-    setDeck(buildDeck());
+    setDeck(buildDeck(grid.total));
     setSelected([]); setTurn(0); setScores([0, 0]); setLocked(false);
     setConfetti(false);
     botMem.current = [];
