@@ -24,25 +24,30 @@ const EMOJI_POOL = [
 
 type Card = { emoji: string; flipped: boolean; matched: boolean };
 
-function buildDeck(): Card[] {
+function buildDeck(totalCards = 16): Card[] {
+  const pairs = Math.max(2, Math.floor(totalCards / 2));
   const pool = [...EMOJI_POOL];
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [pool[i], pool[j]] = [pool[j], pool[i]];
   }
-  const chosen = pool.slice(0, 8);
-  const deck = [...chosen, ...chosen].map((e) => ({ emoji: e, flipped: false, matched: false }));
-  for (let i = deck.length - 1; i > 0; i--) {
+  const chosen = pool.slice(0, pairs);
+  const deck = [...chosen, ...chosen].map((e) => ({ emoji: e, flipped: false, marched: false } as unknown as Card));
+  // restore "matched: false" correctly
+  const deck2 = [...chosen, ...chosen].map((e) => ({ emoji: e, flipped: false, matched: false }));
+  void deck;
+  for (let i = deck2.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [deck[i], deck[j]] = [deck[j], deck[i]];
+    [deck2[i], deck2[j]] = [deck2[j], deck2[i]];
   }
-  return deck;
+  return deck2;
 }
 
 function MultiplayerPage() {
   const [phase, setPhase] = useState<"names" | "play">("names");
   const [p1, setP1] = useState("Player 1");
   const [p2, setP2] = useState("Player 2");
+  const [gridLabel, setGridLabel] = useState<string>(() => getStoredGrid());
   const [deck, setDeck] = useState<Card[]>([]);
   const [selected, setSelected] = useState<number[]>([]);
   const [turn, setTurn] = useState<0 | 1>(0);
