@@ -252,7 +252,7 @@ function VsAIPage() {
           )}
 
           <div className="flex items-center justify-center p-4">
-            <div className="grid grid-cols-4 gap-2 sm:gap-3 w-full max-w-[min(90vw,90vh)]">
+            <div className="grid gap-2 sm:gap-3 w-full max-w-[min(92vw,90vh)]" style={gridStyle(grid.cols)}>
               {deck.map((c, i) => (
                 <MPCard key={i} card={c} onClick={() => onHumanFlip(i)} disabled={turn !== 0 || locked} />
               ))}
