@@ -39,6 +39,7 @@ type GameRoom = {
   player_1_score: number;
   player_2_score: number;
   winner_id: string | null;
+  grid_size: string;
 };
 
 type Phase = "name" | "searching" | "playing";
@@ -50,10 +51,12 @@ function OnlineMatchPage() {
 
   const [playerId] = useState(() => getPlayerId());
   const [name, setName] = useState(() => getPlayerName());
-  const [phase, setPhase] = useState<Phase>(() => (getPlayerName() ? "name" : "name"));
+  const [grid, setGrid] = useState<string>(() => getStoredGrid());
+  const [phase, setPhase] = useState<Phase>("name");
   const [roomId, setRoomId] = useState<string | null>(null);
   const [room, setRoom] = useState<GameRoom | null>(null);
   const [confetti, setConfetti] = useState(false);
+  const [announcedGrid, setAnnouncedGrid] = useState(false);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -62,8 +65,14 @@ function OnlineMatchPage() {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
   };
 
-  const tryJoin = async () => {
-    const res = await join({ data: { player_id: playerId, player_name: name.trim() || "Player" } });
+  const tryJoin = async (gridLabel: string) => {
+    const res = await join({
+      data: {
+        player_id: playerId,
+        player_name: name.trim() || "Player",
+        preferred_grid: gridLabel as "2x2" | "2x3" | "3x4" | "4x4" | "4x5" | "5x6" | "6x6",
+      },
+    });
     if (res.status === "matched" && "game_room_id" in res) {
       clearPolling();
       setRoomId(res.game_room_id);
@@ -75,10 +84,10 @@ function OnlineMatchPage() {
   const startSearch = async () => {
     if (!name.trim()) { toast("Please enter your name"); return; }
     setPlayerName(name.trim());
+    setAnnouncedGrid(false);
     setPhase("searching");
-    await tryJoin();
-    // poll every 2s until matched
-    pollRef.current = setInterval(tryJoin, 2000);
+    await tryJoin(grid);
+    pollRef.current = setInterval(() => tryJoin(grid), 2000);
   };
 
   const cancelSearch = async () => {
