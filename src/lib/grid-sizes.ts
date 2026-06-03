@@ -28,6 +28,6 @@ export function gridColsClass(cols: number): string {
   return `grid gap-2 sm:gap-3 w-full max-w-[min(92vw,90vh)]`;
 }
 
-export function gridStyle(cols: number): React.CSSProperties {
+export function gridStyle(cols: number): CSSProperties {
   return { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` };
 }
