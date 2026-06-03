@@ -302,7 +302,7 @@ function OnlineMatchPage() {
           </div>
 
           <div className="flex items-center justify-center p-4">
-            <div className="grid grid-cols-4 gap-2 sm:gap-3 w-full max-w-[min(90vw,90vh)]">
+            <div className="grid gap-2 sm:gap-3 w-full max-w-[min(92vw,90vh)]" style={gridStyle(roomGrid.cols)}>
               {room.board.map((c, i) => {
                 const revealed = (Array.isArray(room.revealed) ? room.revealed : []).includes(i);
                 const showFront = revealed || c.matched;
