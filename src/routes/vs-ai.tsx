@@ -27,13 +27,14 @@ const EMOJI_POOL = [
 type Card = { emoji: string; flipped: boolean; matched: boolean; seen: boolean };
 type HistoryEntry = { actor: "human" | "ai"; a: number; b: number; emojiA: string; emojiB: string; match: boolean };
 
-function buildDeck(): Card[] {
+function buildDeck(totalCards = 16): Card[] {
+  const pairs = Math.max(2, Math.floor(totalCards / 2));
   const pool = [...EMOJI_POOL];
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [pool[i], pool[j]] = [pool[j], pool[i]];
   }
-  const chosen = pool.slice(0, 8);
+  const chosen = pool.slice(0, pairs);
   const deck = [...chosen, ...chosen].map((e) => ({ emoji: e, flipped: false, matched: false, seen: false }));
   for (let i = deck.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -45,6 +46,7 @@ function buildDeck(): Card[] {
 function VsAIPage() {
   const [phase, setPhase] = useState<"name" | "play">("name");
   const [humanName, setHumanName] = useState("You");
+  const [gridLabel, setGridLabel] = useState<string>(() => getStoredGrid());
   const [deck, setDeck] = useState<Card[]>([]);
   const [selected, setSelected] = useState<number[]>([]);
   const [turn, setTurn] = useState<0 | 1>(0);
