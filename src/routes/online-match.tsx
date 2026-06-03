@@ -147,6 +147,16 @@ function OnlineMatchPage() {
   const oppScore = room ? (iAmP1 ? room.player_2_score : room.player_1_score) : 0;
   const myName = room ? (iAmP1 ? room.player_1_name : room.player_2_name) : name;
   const oppName = room ? (iAmP1 ? room.player_2_name : room.player_1_name) : "Opponent";
+  const roomGridLabel = room?.grid_size || "4x4";
+  const roomGrid = getGrid(roomGridLabel);
+
+  // Announce chosen grid once
+  useEffect(() => {
+    if (phase === "playing" && room && !announcedGrid) {
+      toast(`Grid: ${roomGridLabel} — Good luck!`);
+      setAnnouncedGrid(true);
+    }
+  }, [phase, room, announcedGrid, roomGridLabel]);
 
   const flip = async (idx: number) => {
     if (!room || !isMyTurn) return;
