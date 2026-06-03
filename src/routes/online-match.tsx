@@ -235,16 +235,20 @@ function OnlineMatchPage() {
           <div className="glass rounded-3xl p-6 w-full max-w-md pop-in">
             <h2 className="text-xl font-black mb-1 text-center">Find an Opponent</h2>
             <p className="text-xs text-muted-foreground text-center mb-5">
-              Choose a name, then we'll match you with a random player.
+              Choose a name and grid size, then we'll match you with a random player.
             </p>
             <label className="text-xs uppercase tracking-widest text-accent">Your Name</label>
             <input
               value={name}
               onChange={(e) => setName(e.target.value.slice(0, 20))}
-              className="w-full mt-1 mb-5 px-4 py-3 rounded-xl bg-background/40 border border-white/15 focus:outline-none focus:border-accent text-sm"
+              className="w-full mt-1 mb-4 px-4 py-3 rounded-xl bg-background/40 border border-white/15 focus:outline-none focus:border-accent text-sm"
               placeholder="Cosmic Player"
               autoFocus
             />
+            <GridSizeSelector value={grid} onChange={setGrid} className="mb-5" />
+            <p className="text-[11px] text-muted-foreground mb-4">
+              If your opponent picks a different size, the game randomly chooses one of the two.
+            </p>
             <button onClick={startSearch} className="btn-cosmic w-full !py-3 text-base">
               🔭 Find Match
             </button>
