@@ -3,6 +3,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef, useState } from "react";
 import { Universe } from "@/components/Universe";
 import { Confetti } from "@/components/Confetti";
+import { GridSizeSelector, getStoredGrid } from "@/components/GridSizeSelector";
+import { gridStyle, getGrid } from "@/lib/grid-sizes";
 import { supabase } from "@/integrations/supabase/client";
 import {
   getPlayerId,
