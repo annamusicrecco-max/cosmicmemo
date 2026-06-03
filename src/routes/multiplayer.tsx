@@ -53,16 +53,17 @@ function MultiplayerPage() {
   const [confetti, setConfetti] = useState(false);
 
   const names = useMemo(() => [p1.trim() || "Player 1", p2.trim() || "Player 2"] as const, [p1, p2]);
+  const grid = useMemo(() => getGrid(gridLabel), [gridLabel]);
   const allMatched = deck.length > 0 && deck.every((c) => c.matched);
 
   const start = () => {
-    setDeck(buildDeck());
+    setDeck(buildDeck(grid.total));
     setSelected([]); setTurn(0); setScores([0, 0]); setLocked(false);
     setPhase("play");
   };
 
   const reset = () => {
-    setDeck(buildDeck());
+    setDeck(buildDeck(grid.total));
     setSelected([]); setTurn(0); setScores([0, 0]); setLocked(false);
     setConfetti(false);
   };
