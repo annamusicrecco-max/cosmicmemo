@@ -2,6 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Universe } from "@/components/Universe";
 import { Confetti } from "@/components/Confetti";
+import { GridSizeSelector, getStoredGrid } from "@/components/GridSizeSelector";
+import { getGrid, gridStyle } from "@/lib/grid-sizes";
 import { beep, vibrate } from "@/lib/game-state";
 
 export const Route = createFileRoute("/vs-bot")({
