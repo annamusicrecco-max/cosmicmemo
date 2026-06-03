@@ -19,6 +19,7 @@ export type Database = {
           board: Json
           created_at: string
           current_turn: string
+          grid_size: string
           id: string
           player_1_id: string
           player_1_name: string
@@ -35,6 +36,7 @@ export type Database = {
           board: Json
           created_at?: string
           current_turn: string
+          grid_size?: string
           id?: string
           player_1_id: string
           player_1_name?: string
@@ -51,6 +53,7 @@ export type Database = {
           board?: Json
           created_at?: string
           current_turn?: string
+          grid_size?: string
           id?: string
           player_1_id?: string
           player_1_name?: string
@@ -71,18 +74,21 @@ export type Database = {
           joined_at: string
           player_id: string
           player_name: string
+          preferred_grid: string
         }
         Insert: {
           id?: string
           joined_at?: string
           player_id: string
           player_name?: string
+          preferred_grid?: string
         }
         Update: {
           id?: string
           joined_at?: string
           player_id?: string
           player_name?: string
+          preferred_grid?: string
         }
         Relationships: []
       }
