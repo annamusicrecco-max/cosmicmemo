@@ -32,15 +32,12 @@ function buildDeck(totalCards = 16): Card[] {
     [pool[i], pool[j]] = [pool[j], pool[i]];
   }
   const chosen = pool.slice(0, pairs);
-  const deck = [...chosen, ...chosen].map((e) => ({ emoji: e, flipped: false, marched: false } as unknown as Card));
-  // restore "matched: false" correctly
-  const deck2 = [...chosen, ...chosen].map((e) => ({ emoji: e, flipped: false, matched: false }));
-  void deck;
-  for (let i = deck2.length - 1; i > 0; i--) {
+  const deck = [...chosen, ...chosen].map((e) => ({ emoji: e, flipped: false, matched: false }));
+  for (let i = deck.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [deck2[i], deck2[j]] = [deck2[j], deck2[i]];
+    [deck[i], deck[j]] = [deck[j], deck[i]];
   }
-  return deck2;
+  return deck;
 }
 
 function MultiplayerPage() {
