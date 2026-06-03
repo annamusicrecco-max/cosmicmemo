@@ -241,8 +241,10 @@ function VsBotPage() {
 
             <label className="text-xs uppercase tracking-widest text-accent">Your name</label>
             <input value={humanName} onChange={(e) => setHumanName(e.target.value.slice(0, 20))}
-              className="w-full mt-1 mb-5 px-4 py-3 rounded-xl bg-background/40 border border-white/15 focus:outline-none focus:border-accent text-sm"
+              className="w-full mt-1 mb-4 px-4 py-3 rounded-xl bg-background/40 border border-white/15 focus:outline-none focus:border-accent text-sm"
               placeholder="You" />
+
+            <GridSizeSelector value={gridLabel} onChange={setGridLabel} className="mb-5" />
 
             <button onClick={start} className="btn-cosmic w-full !py-3 text-base">Start Game</button>
           </div>
