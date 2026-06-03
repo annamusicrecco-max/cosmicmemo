@@ -156,7 +156,9 @@ function MultiplayerPage() {
             <label className="text-xs uppercase tracking-widest text-accent">Player 2</label>
             <input value={p2} onChange={(e) => setP2(e.target.value.slice(0, 20))}
               className="w-full mt-1 mb-5 px-4 py-3 rounded-xl bg-background/40 border border-white/15 focus:outline-none focus:border-accent text-sm"
-              placeholder="Player 2" />
+             placeholder="Player 2" />
+
+            <GridSizeSelector value={gridLabel} onChange={setGridLabel} className="mb-5" />
 
             <button onClick={start} className="btn-cosmic w-full !py-3 text-base">Start Game</button>
           </div>
