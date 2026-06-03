@@ -301,11 +301,6 @@ function OnlineMatchPage() {
                   : `${oppName}'s turn`}
             <span className="ml-2 text-[11px] text-muted-foreground">· Grid {roomGridLabel}</span>
           </div>
-                ? "Opponent left — you win"
-                : isMyTurn
-                  ? "Your turn"
-                  : `${oppName}'s turn`}
-          </div>
 
           <div className="flex items-center justify-center p-4">
             <div className="grid gap-2 sm:gap-3 w-full max-w-[min(92vw,90vh)]" style={gridStyle(roomGrid.cols)}>
