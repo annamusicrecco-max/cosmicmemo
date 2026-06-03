@@ -1,3 +1,5 @@
+import type { CSSProperties } from "react";
+
 export type GridSize = {
   label: string;
   rows: number;
