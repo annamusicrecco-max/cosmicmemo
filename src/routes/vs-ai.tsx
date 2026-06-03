@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Universe } from "@/components/Universe";
 import { Confetti } from "@/components/Confetti";
+import { GridSizeSelector, getStoredGrid } from "@/components/GridSizeSelector";
+import { getGrid, gridStyle } from "@/lib/grid-sizes";
 import { beep, vibrate } from "@/lib/game-state";
 import { pickAiMove } from "@/lib/vs-ai.functions";
 
