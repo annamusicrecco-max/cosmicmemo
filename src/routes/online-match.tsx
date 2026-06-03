@@ -299,6 +299,12 @@ function OnlineMatchPage() {
                 : isMyTurn
                   ? "Your turn"
                   : `${oppName}'s turn`}
+            <span className="ml-2 text-[11px] text-muted-foreground">· Grid {roomGridLabel}</span>
+          </div>
+                ? "Opponent left — you win"
+                : isMyTurn
+                  ? "Your turn"
+                  : `${oppName}'s turn`}
           </div>
 
           <div className="flex items-center justify-center p-4">
