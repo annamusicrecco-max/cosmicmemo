@@ -28,17 +28,20 @@ export const CARD_EMOJIS = [
   "🌞", "🌙", "⭐", "🌈", "🔥", "💧", "❄️", "⚡",
   "🐱", "🐶", "🦊", "🐻", "🐼", "🐨", "🐯", "🦁",
   "🚀", "🛸", "🪐", "☄️", "🌌", "👽", "🤖", "🎈",
+  "🍕", "🍔", "🍩", "🍓", "🍉", "🍇", "🥑", "🌮",
+  "🎸", "🎺", "🎲", "🎯", "🎨", "🧩", "♠️", "♥️",
 ];
 
 export type BoardCard = { id: number; emoji: string; matched: boolean };
 
-export function buildBoard(): BoardCard[] {
+export function buildBoard(totalCards = 16): BoardCard[] {
+  const pairs = Math.max(2, Math.floor(totalCards / 2));
   const pool = [...CARD_EMOJIS];
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [pool[i], pool[j]] = [pool[j], pool[i]];
   }
-  const chosen = pool.slice(0, 8);
+  const chosen = pool.slice(0, pairs);
   const deck = [...chosen, ...chosen].map((emoji, id) => ({ id, emoji, matched: false }));
   for (let i = deck.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));

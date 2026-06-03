@@ -2,6 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Universe } from "@/components/Universe";
 import { Confetti } from "@/components/Confetti";
+import { GridSizeSelector, getStoredGrid } from "@/components/GridSizeSelector";
+import { getGrid, gridStyle } from "@/lib/grid-sizes";
 import { beep, vibrate } from "@/lib/game-state";
 
 export const Route = createFileRoute("/multiplayer")({
@@ -22,13 +24,14 @@ const EMOJI_POOL = [
 
 type Card = { emoji: string; flipped: boolean; matched: boolean };
 
-function buildDeck(): Card[] {
+function buildDeck(totalCards = 16): Card[] {
+  const pairs = Math.max(2, Math.floor(totalCards / 2));
   const pool = [...EMOJI_POOL];
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [pool[i], pool[j]] = [pool[j], pool[i]];
   }
-  const chosen = pool.slice(0, 8);
+  const chosen = pool.slice(0, pairs);
   const deck = [...chosen, ...chosen].map((e) => ({ emoji: e, flipped: false, matched: false }));
   for (let i = deck.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -41,6 +44,7 @@ function MultiplayerPage() {
   const [phase, setPhase] = useState<"names" | "play">("names");
   const [p1, setP1] = useState("Player 1");
   const [p2, setP2] = useState("Player 2");
+  const [gridLabel, setGridLabel] = useState<string>(() => getStoredGrid());
   const [deck, setDeck] = useState<Card[]>([]);
   const [selected, setSelected] = useState<number[]>([]);
   const [turn, setTurn] = useState<0 | 1>(0);
@@ -49,16 +53,17 @@ function MultiplayerPage() {
   const [confetti, setConfetti] = useState(false);
 
   const names = useMemo(() => [p1.trim() || "Player 1", p2.trim() || "Player 2"] as const, [p1, p2]);
+  const grid = useMemo(() => getGrid(gridLabel), [gridLabel]);
   const allMatched = deck.length > 0 && deck.every((c) => c.matched);
 
   const start = () => {
-    setDeck(buildDeck());
+    setDeck(buildDeck(grid.total));
     setSelected([]); setTurn(0); setScores([0, 0]); setLocked(false);
     setPhase("play");
   };
 
   const reset = () => {
-    setDeck(buildDeck());
+    setDeck(buildDeck(grid.total));
     setSelected([]); setTurn(0); setScores([0, 0]); setLocked(false);
     setConfetti(false);
   };
@@ -151,7 +156,9 @@ function MultiplayerPage() {
             <label className="text-xs uppercase tracking-widest text-accent">Player 2</label>
             <input value={p2} onChange={(e) => setP2(e.target.value.slice(0, 20))}
               className="w-full mt-1 mb-5 px-4 py-3 rounded-xl bg-background/40 border border-white/15 focus:outline-none focus:border-accent text-sm"
-              placeholder="Player 2" />
+             placeholder="Player 2" />
+
+            <GridSizeSelector value={gridLabel} onChange={setGridLabel} className="mb-5" />
 
             <button onClick={start} className="btn-cosmic w-full !py-3 text-base">Start Game</button>
           </div>
@@ -171,7 +178,7 @@ function MultiplayerPage() {
           </div>
 
           <div className="flex items-center justify-center p-4">
-            <div className="grid grid-cols-4 gap-2 sm:gap-3 w-full max-w-[min(90vw,90vh)]">
+            <div className="grid gap-2 sm:gap-3 w-full max-w-[min(92vw,90vh)]" style={gridStyle(grid.cols)}>
               {deck.map((c, i) => (
                 <MPCard key={i} card={c} onClick={() => onFlip(i)} />
               ))}

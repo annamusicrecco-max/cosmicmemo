@@ -3,6 +3,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef, useState } from "react";
 import { Universe } from "@/components/Universe";
 import { Confetti } from "@/components/Confetti";
+import { GridSizeSelector, getStoredGrid } from "@/components/GridSizeSelector";
+import { gridStyle, getGrid } from "@/lib/grid-sizes";
 import { supabase } from "@/integrations/supabase/client";
 import {
   getPlayerId,
@@ -37,6 +39,7 @@ type GameRoom = {
   player_1_score: number;
   player_2_score: number;
   winner_id: string | null;
+  grid_size: string;
 };
 
 type Phase = "name" | "searching" | "playing";
@@ -48,10 +51,12 @@ function OnlineMatchPage() {
 
   const [playerId] = useState(() => getPlayerId());
   const [name, setName] = useState(() => getPlayerName());
-  const [phase, setPhase] = useState<Phase>(() => (getPlayerName() ? "name" : "name"));
+  const [grid, setGrid] = useState<string>(() => getStoredGrid());
+  const [phase, setPhase] = useState<Phase>("name");
   const [roomId, setRoomId] = useState<string | null>(null);
   const [room, setRoom] = useState<GameRoom | null>(null);
   const [confetti, setConfetti] = useState(false);
+  const [announcedGrid, setAnnouncedGrid] = useState(false);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -60,8 +65,14 @@ function OnlineMatchPage() {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
   };
 
-  const tryJoin = async () => {
-    const res = await join({ data: { player_id: playerId, player_name: name.trim() || "Player" } });
+  const tryJoin = async (gridLabel: string) => {
+    const res = await join({
+      data: {
+        player_id: playerId,
+        player_name: name.trim() || "Player",
+        preferred_grid: gridLabel as "2x2" | "2x3" | "3x4" | "4x4" | "4x5" | "5x6" | "6x6",
+      },
+    });
     if (res.status === "matched" && "game_room_id" in res) {
       clearPolling();
       setRoomId(res.game_room_id);
@@ -73,10 +84,10 @@ function OnlineMatchPage() {
   const startSearch = async () => {
     if (!name.trim()) { toast("Please enter your name"); return; }
     setPlayerName(name.trim());
+    setAnnouncedGrid(false);
     setPhase("searching");
-    await tryJoin();
-    // poll every 2s until matched
-    pollRef.current = setInterval(tryJoin, 2000);
+    await tryJoin(grid);
+    pollRef.current = setInterval(() => tryJoin(grid), 2000);
   };
 
   const cancelSearch = async () => {
@@ -136,6 +147,16 @@ function OnlineMatchPage() {
   const oppScore = room ? (iAmP1 ? room.player_2_score : room.player_1_score) : 0;
   const myName = room ? (iAmP1 ? room.player_1_name : room.player_2_name) : name;
   const oppName = room ? (iAmP1 ? room.player_2_name : room.player_1_name) : "Opponent";
+  const roomGridLabel = room?.grid_size || "4x4";
+  const roomGrid = getGrid(roomGridLabel);
+
+  // Announce chosen grid once
+  useEffect(() => {
+    if (phase === "playing" && room && !announcedGrid) {
+      toast(`Grid: ${roomGridLabel} — Good luck!`);
+      setAnnouncedGrid(true);
+    }
+  }, [phase, room, announcedGrid, roomGridLabel]);
 
   const flip = async (idx: number) => {
     if (!room || !isMyTurn) return;
@@ -224,16 +245,20 @@ function OnlineMatchPage() {
           <div className="glass rounded-3xl p-6 w-full max-w-md pop-in">
             <h2 className="text-xl font-black mb-1 text-center">Find an Opponent</h2>
             <p className="text-xs text-muted-foreground text-center mb-5">
-              Choose a name, then we'll match you with a random player.
+              Choose a name and grid size, then we'll match you with a random player.
             </p>
             <label className="text-xs uppercase tracking-widest text-accent">Your Name</label>
             <input
               value={name}
               onChange={(e) => setName(e.target.value.slice(0, 20))}
-              className="w-full mt-1 mb-5 px-4 py-3 rounded-xl bg-background/40 border border-white/15 focus:outline-none focus:border-accent text-sm"
+              className="w-full mt-1 mb-4 px-4 py-3 rounded-xl bg-background/40 border border-white/15 focus:outline-none focus:border-accent text-sm"
               placeholder="Cosmic Player"
               autoFocus
             />
+            <GridSizeSelector value={grid} onChange={setGrid} className="mb-5" />
+            <p className="text-[11px] text-muted-foreground mb-4">
+              If your opponent picks a different size, the game randomly chooses one of the two.
+            </p>
             <button onClick={startSearch} className="btn-cosmic w-full !py-3 text-base">
               🔭 Find Match
             </button>
@@ -274,10 +299,11 @@ function OnlineMatchPage() {
                 : isMyTurn
                   ? "Your turn"
                   : `${oppName}'s turn`}
+            <span className="ml-2 text-[11px] text-muted-foreground">· Grid {roomGridLabel}</span>
           </div>
 
           <div className="flex items-center justify-center p-4">
-            <div className="grid grid-cols-4 gap-2 sm:gap-3 w-full max-w-[min(90vw,90vh)]">
+            <div className="grid gap-2 sm:gap-3 w-full max-w-[min(92vw,90vh)]" style={gridStyle(roomGrid.cols)}>
               {room.board.map((c, i) => {
                 const revealed = (Array.isArray(room.revealed) ? room.revealed : []).includes(i);
                 const showFront = revealed || c.matched;
