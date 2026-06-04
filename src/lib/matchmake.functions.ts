@@ -21,7 +21,6 @@ export const joinMatchmaking = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { player_id, player_name, preferred_grid } = data;
 
-    // 1. If this player is already in an active game, return that room
     const { data: existingRoom } = await supabaseAdmin
       .from("game_rooms")
       .select("id")
@@ -34,7 +33,6 @@ export const joinMatchmaking = createServerFn({ method: "POST" })
       return { status: "matched" as const, game_room_id: existingRoom.id };
     }
 
-    // 2. Look for another waiting player (not this one)
     const { data: others } = await supabaseAdmin
       .from("waiting_players")
       .select("player_id, player_name, preferred_grid")
@@ -45,15 +43,11 @@ export const joinMatchmaking = createServerFn({ method: "POST" })
     if (others && others.length > 0) {
       const opponent = others[0] as { player_id: string; player_name: string; preferred_grid: string };
       const oppGrid = opponent.preferred_grid || "4x4";
-      // Choose grid: same → that; different → random pick of the two
       const grid_size =
         oppGrid === preferred_grid
           ? preferred_grid
-          : Math.random() < 0.5
-            ? preferred_grid
-            : oppGrid;
+          : Math.random() < 0.5 ? preferred_grid : oppGrid;
 
-      // Coin flip for who goes first
       const p1First = Math.random() < 0.5;
       const player_1_id = p1First ? player_id : opponent.player_id;
       const player_2_id = p1First ? opponent.player_id : player_id;
@@ -65,10 +59,7 @@ export const joinMatchmaking = createServerFn({ method: "POST" })
       const { data: room, error: roomErr } = await supabaseAdmin
         .from("game_rooms")
         .insert({
-          player_1_id,
-          player_2_id,
-          player_1_name,
-          player_2_name,
+          player_1_id, player_2_id, player_1_name, player_2_name,
           current_turn: player_1_id,
           board: board as never,
           status: "active",
@@ -78,7 +69,6 @@ export const joinMatchmaking = createServerFn({ method: "POST" })
         .single();
       if (roomErr || !room) throw new Error(roomErr?.message ?? "Failed to create room");
 
-      // Remove both from queue
       await supabaseAdmin
         .from("waiting_players")
         .delete()
@@ -87,7 +77,6 @@ export const joinMatchmaking = createServerFn({ method: "POST" })
       return { status: "matched" as const, game_room_id: room.id };
     }
 
-    // 3. No opponent yet — upsert self into queue
     await supabaseAdmin
       .from("waiting_players")
       .upsert(
@@ -105,4 +94,76 @@ export const leaveMatchmaking = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     await supabaseAdmin.from("waiting_players").delete().eq("player_id", data.player_id);
     return { ok: true };
+  });
+
+// --------- Invite link flow ---------
+
+const CreateInviteSchema = z.object({
+  player_id: z.string().min(4).max(64),
+  player_name: z.string().min(1).max(20),
+  preferred_grid: z.enum(GRID_LABELS).default("4x4"),
+});
+
+export const createInviteRoom = createServerFn({ method: "POST" })
+  .inputValidator((input) => CreateInviteSchema.parse(input))
+  .handler(async ({ data }) => {
+    const { player_id, player_name, preferred_grid } = data;
+    const board = buildBoard(totalForLabel(preferred_grid));
+    const { data: room, error } = await supabaseAdmin
+      .from("game_rooms")
+      .insert({
+        player_1_id: player_id,
+        player_2_id: "__waiting__",
+        player_1_name: player_name,
+        player_2_name: "Waiting…",
+        current_turn: player_id,
+        board: board as never,
+        status: "waiting",
+        grid_size: preferred_grid,
+      })
+      .select("id")
+      .single();
+    if (error || !room) throw new Error(error?.message ?? "Failed to create invite room");
+    return { game_room_id: room.id };
+  });
+
+const JoinInviteSchema = z.object({
+  room_id: z.string().uuid(),
+  player_id: z.string().min(4).max(64),
+  player_name: z.string().min(1).max(20),
+});
+
+export const joinInviteRoom = createServerFn({ method: "POST" })
+  .inputValidator((input) => JoinInviteSchema.parse(input))
+  .handler(async ({ data }) => {
+    const { room_id, player_id, player_name } = data;
+    const { data: room, error: fetchErr } = await supabaseAdmin
+      .from("game_rooms")
+      .select("id, player_1_id, status")
+      .eq("id", room_id)
+      .maybeSingle();
+    if (fetchErr || !room) throw new Error("Invite not found");
+    // If player_1 reopens their own link, just bounce them back into the room
+    if (room.player_1_id === player_id) {
+      return { game_room_id: room.id, role: "host" as const };
+    }
+    if (room.status === "active") {
+      // Someone else already joined
+      throw new Error("This invite has already been used");
+    }
+    if (room.status !== "waiting") throw new Error("Invite no longer valid");
+
+    const { error: updErr } = await supabaseAdmin
+      .from("game_rooms")
+      .update({
+        player_2_id: player_id,
+        player_2_name: player_name,
+        status: "active",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", room_id)
+      .eq("status", "waiting");
+    if (updErr) throw new Error(updErr.message);
+
+    return { game_room_id: room.id, role: "guest" as const };
   });

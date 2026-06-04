@@ -63,7 +63,9 @@ export type InventoryItem = {
   usedAt?: number;
 };
 
-export type CardBack = "default" | "galaxy" | "nebula" | "starlight";
+export type CardBack = "default" | "galaxy" | "nebula" | "starlight" | "cosmos" | "supernova" | "aurora";
+
+export const PREMIUM_CARD_BACKS: CardBack[] = ["cosmos", "supernova", "aurora"];
 
 export type GameState = {
   highestUnlocked: number;

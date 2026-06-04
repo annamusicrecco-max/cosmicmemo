@@ -1,18 +1,19 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Universe } from "@/components/Universe";
 import { Confetti } from "@/components/Confetti";
 import { GridSizeSelector, getStoredGrid } from "@/components/GridSizeSelector";
 import { gridStyle, getGrid } from "@/lib/grid-sizes";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  getPlayerId,
-  getPlayerName,
-  setPlayerName,
+  getPlayerId, getPlayerName, setPlayerName,
   type BoardCard,
 } from "@/lib/online";
-import { joinMatchmaking, leaveMatchmaking } from "@/lib/matchmake.functions";
+import {
+  joinMatchmaking, leaveMatchmaking,
+  createInviteRoom, joinInviteRoom,
+} from "@/lib/matchmake.functions";
 import { beep, vibrate } from "@/lib/game-state";
 import { toast } from "sonner";
 
@@ -21,7 +22,7 @@ export const Route = createFileRoute("/online-match")({
   head: () => ({
     meta: [
       { title: "Online Match — Cosmic Memory" },
-      { name: "description", content: "Play Cosmic Memory online against a random opponent." },
+      { name: "description", content: "Play Cosmic Memory online against a random opponent or a friend via invite." },
     ],
   }),
 });
@@ -42,12 +43,20 @@ type GameRoom = {
   grid_size: string;
 };
 
-type Phase = "name" | "searching" | "playing";
+type Phase = "name" | "searching" | "inviting" | "playing";
 
 function OnlineMatchPage() {
   const navigate = useNavigate();
   const join = useServerFn(joinMatchmaking);
   const leave = useServerFn(leaveMatchmaking);
+  const createInvite = useServerFn(createInviteRoom);
+  const joinInvite = useServerFn(joinInviteRoom);
+
+  const inviteIdFromUrl = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    const u = new URL(window.location.href);
+    return u.searchParams.get("invite");
+  }, []);
 
   const [playerId] = useState(() => getPlayerId());
   const [name, setName] = useState(() => getPlayerName());
@@ -57,6 +66,8 @@ function OnlineMatchPage() {
   const [room, setRoom] = useState<GameRoom | null>(null);
   const [confetti, setConfetti] = useState(false);
   const [announcedGrid, setAnnouncedGrid] = useState(false);
+  const [inviteLink, setInviteLink] = useState<string>("");
+  const [opponentJoinedToasted, setOpponentJoinedToasted] = useState(false);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -80,7 +91,6 @@ function OnlineMatchPage() {
     }
   };
 
-  // Start searching
   const startSearch = async () => {
     if (!name.trim()) { toast("Please enter your name"); return; }
     setPlayerName(name.trim());
@@ -96,16 +106,62 @@ function OnlineMatchPage() {
     setPhase("name");
   };
 
+  const startInvite = async () => {
+    if (!name.trim()) { toast("Please enter your name"); return; }
+    setPlayerName(name.trim());
+    setAnnouncedGrid(false);
+    try {
+      const res = await createInvite({
+        data: {
+          player_id: playerId,
+          player_name: name.trim(),
+          preferred_grid: grid as "2x2" | "2x3" | "3x4" | "4x4" | "4x5" | "5x6" | "6x6",
+        },
+      });
+      const link = `${window.location.origin}/online-match?invite=${res.game_room_id}`;
+      setInviteLink(link);
+      setRoomId(res.game_room_id);
+      setOpponentJoinedToasted(false);
+      setPhase("inviting");
+    } catch (e) {
+      toast(`Failed to create invite: ${(e as Error).message}`);
+    }
+  };
+
+  const acceptInvite = async (inviteId: string) => {
+    if (!name.trim()) { toast("Please enter your name"); return; }
+    setPlayerName(name.trim());
+    try {
+      const res = await joinInvite({
+        data: { room_id: inviteId, player_id: playerId, player_name: name.trim() },
+      });
+      setRoomId(res.game_room_id);
+      setAnnouncedGrid(false);
+      setPhase("playing");
+    } catch (e) {
+      toast(`${(e as Error).message}`);
+    }
+  };
+
+  const copyLink = async () => {
+    try { await navigator.clipboard.writeText(inviteLink); toast("Invite link copied!"); }
+    catch { toast(inviteLink); }
+  };
+  const shareLink = async () => {
+    if (typeof navigator !== "undefined" && "share" in navigator) {
+      try { await navigator.share({ title: "Cosmic Memory", text: "Join me for a Cosmic Memory match!", url: inviteLink }); return; }
+      catch { /* fallthrough */ }
+    }
+    copyLink();
+  };
+
   // Subscribe to room updates
   useEffect(() => {
     if (!roomId) return;
     let cancelled = false;
     (async () => {
       const { data, error } = await supabase
-        .from("game_rooms")
-        .select("*")
-        .eq("id", roomId)
-        .maybeSingle();
+        .from("game_rooms").select("*").eq("id", roomId).maybeSingle();
       if (!cancelled && data && !error) setRoom(data as unknown as GameRoom);
     })();
 
@@ -126,6 +182,17 @@ function OnlineMatchPage() {
     };
   }, [roomId]);
 
+  // Inviter notification when guest joins
+  useEffect(() => {
+    if (phase === "inviting" && room && room.status === "active" && !opponentJoinedToasted) {
+      setOpponentJoinedToasted(true);
+      beep("match");
+      vibrate(80);
+      toast(`🎉 ${room.player_2_name} joined! Game starting…`);
+      setTimeout(() => setPhase("playing"), 600);
+    }
+  }, [phase, room, opponentJoinedToasted]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => { clearPolling(); leave({ data: { player_id: playerId } }).catch(() => {}); };
@@ -135,8 +202,7 @@ function OnlineMatchPage() {
   // Win confetti
   useEffect(() => {
     if (room?.status === "completed" && room.winner_id === playerId && !confetti) {
-      setConfetti(true);
-      beep("win");
+      setConfetti(true); beep("win");
       setTimeout(() => setConfetti(false), 2400);
     }
   }, [room?.status, room?.winner_id, playerId, confetti]);
@@ -150,7 +216,6 @@ function OnlineMatchPage() {
   const roomGridLabel = room?.grid_size || "4x4";
   const roomGrid = getGrid(roomGridLabel);
 
-  // Announce chosen grid once
   useEffect(() => {
     if (phase === "playing" && room && !announcedGrid) {
       toast(`Grid: ${roomGridLabel} — Good luck!`);
@@ -172,20 +237,16 @@ function OnlineMatchPage() {
 
     if (newRevealed.length === 1) {
       await supabase.from("game_rooms").update({
-        revealed: newRevealed as never,
-        updated_at: new Date().toISOString(),
+        revealed: newRevealed as never, updated_at: new Date().toISOString(),
       }).eq("id", room.id);
       return;
     }
 
-    // Second flip — resolve match/miss
     const [a, b] = newRevealed;
     const isMatch = board[a].emoji === board[b].emoji;
 
-    // Show both for a moment
     await supabase.from("game_rooms").update({
-      revealed: newRevealed as never,
-      updated_at: new Date().toISOString(),
+      revealed: newRevealed as never, updated_at: new Date().toISOString(),
     }).eq("id", room.id);
 
     setTimeout(async () => {
@@ -226,7 +287,17 @@ function OnlineMatchPage() {
         winner_id: iAmP1 ? room.player_2_id : room.player_1_id,
       }).eq("id", room.id);
     }
+    if (room && room.status === "waiting") {
+      await supabase.from("game_rooms").update({ status: "abandoned" }).eq("id", room.id);
+    }
     navigate({ to: "/levels" });
+  };
+
+  const cancelInvite = async () => {
+    if (room) await supabase.from("game_rooms").update({ status: "abandoned" }).eq("id", room.id);
+    setRoomId(null); setRoom(null); setInviteLink(""); setPhase("name");
+    // also clear ?invite from URL
+    if (inviteIdFromUrl) window.history.replaceState(null, "", "/online-match");
   };
 
   return (
@@ -243,9 +314,13 @@ function OnlineMatchPage() {
       {phase === "name" && (
         <div className="flex items-center justify-center p-6">
           <div className="glass rounded-3xl p-6 w-full max-w-md pop-in">
-            <h2 className="text-xl font-black mb-1 text-center">Find an Opponent</h2>
+            <h2 className="text-xl font-black mb-1 text-center">
+              {inviteIdFromUrl ? "Join Friend's Match" : "Find an Opponent"}
+            </h2>
             <p className="text-xs text-muted-foreground text-center mb-5">
-              Choose a name and grid size, then we'll match you with a random player.
+              {inviteIdFromUrl
+                ? "You've been invited! Enter your name to join."
+                : "Match with a random player or invite a friend."}
             </p>
             <label className="text-xs uppercase tracking-widest text-accent">Your Name</label>
             <input
@@ -255,13 +330,36 @@ function OnlineMatchPage() {
               placeholder="Cosmic Player"
               autoFocus
             />
-            <GridSizeSelector value={grid} onChange={setGrid} className="mb-5" />
-            <p className="text-[11px] text-muted-foreground mb-4">
-              If your opponent picks a different size, the game randomly chooses one of the two.
-            </p>
-            <button onClick={startSearch} className="btn-cosmic w-full !py-3 text-base">
-              🔭 Find Match
-            </button>
+            {!inviteIdFromUrl && (
+              <>
+                <GridSizeSelector value={grid} onChange={setGrid} className="mb-5" />
+                <p className="text-[11px] text-muted-foreground mb-4">
+                  Random match: if opponent picks a different size, one is chosen at random. Invite: your size is used.
+                </p>
+              </>
+            )}
+
+            {inviteIdFromUrl ? (
+              <button onClick={() => acceptInvite(inviteIdFromUrl)} className="btn-cosmic w-full !py-3 text-base">
+                🚀 Join Match
+              </button>
+            ) : (
+              <div className="space-y-2">
+                <button onClick={startSearch} className="btn-cosmic w-full !py-3 text-base">
+                  🔭 Find Random Match
+                </button>
+                <button
+                  onClick={startInvite}
+                  className="w-full py-3 rounded-full font-black text-white text-sm"
+                  style={{
+                    background: "linear-gradient(135deg,#22d3ee,#a855f7)",
+                    boxShadow: "0 8px 24px rgba(168,85,247,0.45), inset 0 1px 0 rgba(255,255,255,0.35)",
+                  }}
+                >
+                  🔗 Invite a Friend
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -279,6 +377,28 @@ function OnlineMatchPage() {
         </div>
       )}
 
+      {phase === "inviting" && (
+        <div className="flex items-center justify-center p-6">
+          <div className="glass rounded-3xl p-6 w-full max-w-md pop-in text-center">
+            <div className="text-5xl mb-2 animate-pulse">🔗</div>
+            <h2 className="text-xl font-black mb-1">Invite Sent</h2>
+            <p className="text-xs text-muted-foreground mb-4">
+              Share this link with your friend. The game starts the moment they join — you'll get a notification right here.
+            </p>
+            <div className="rounded-xl p-3 text-xs break-all border border-white/15 mb-3"
+              style={{ background: "rgba(0,0,0,0.35)" }}>
+              {inviteLink}
+            </div>
+            <div className="flex gap-2 mb-4">
+              <button onClick={copyLink} className="flex-1 glass rounded-full py-2.5 text-sm font-semibold">📋 Copy</button>
+              <button onClick={shareLink} className="flex-1 btn-cosmic !py-2.5 text-sm">📤 Share</button>
+            </div>
+            <p className="text-[11px] text-muted-foreground mb-3">Grid: {grid} · Waiting for opponent…</p>
+            <button onClick={cancelInvite} className="text-xs text-muted-foreground underline">Cancel invite</button>
+          </div>
+        </div>
+      )}
+
       {phase === "playing" && room && (
         <>
           <div className="flex items-center justify-center gap-2 px-4 mt-3 flex-wrap">
@@ -289,16 +409,11 @@ function OnlineMatchPage() {
 
           <div className="text-center mt-2 text-sm font-semibold text-accent">
             {room.status === "completed"
-              ? room.winner_id === playerId
-                ? "🏆 You win!"
-                : room.winner_id === null
-                  ? "It's a tie!"
-                  : `${oppName} wins`
-              : room.status === "abandoned"
-                ? "Opponent left — you win"
-                : isMyTurn
-                  ? "Your turn"
-                  : `${oppName}'s turn`}
+              ? room.winner_id === playerId ? "🏆 You win!"
+                : room.winner_id === null ? "It's a tie!"
+                : `${oppName} wins`
+              : room.status === "abandoned" ? "Opponent left — you win"
+              : isMyTurn ? "Your turn" : `${oppName}'s turn`}
             <span className="ml-2 text-[11px] text-muted-foreground">· Grid {roomGridLabel}</span>
           </div>
 
@@ -336,7 +451,10 @@ function OnlineMatchPage() {
               <>
                 <button
                   className="btn-cosmic !px-5 !py-2.5 text-sm"
-                  onClick={() => { setRoom(null); setRoomId(null); setPhase("name"); }}
+                  onClick={() => {
+                    setRoom(null); setRoomId(null); setPhase("name");
+                    if (inviteIdFromUrl) window.history.replaceState(null, "", "/online-match");
+                  }}
                 >
                   Play Again
                 </button>
