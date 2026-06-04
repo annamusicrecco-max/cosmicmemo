@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
-import { loadState, saveState, resetState, type CardBack } from "@/lib/game-state";
+import { loadState, saveState, resetState, type CardBack, PREMIUM_CARD_BACKS } from "@/lib/game-state";
 import { setMuted } from "@/lib/audio";
 import { DonateModal } from "@/components/DonateModal";
+import { useNavigate } from "@tanstack/react-router";
+
+const ALL_CARD_BACKS: CardBack[] = ["default", "galaxy", "nebula", "starlight", "cosmos", "supernova", "aurora"];
 
 export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const navigate = useNavigate();
   const [muted, setMutedState] = useState(false);
   const [premium, setPremium] = useState(false);
   const [cardBack, setCardBack] = useState<CardBack>("default");
-  const [showPremium, setShowPremium] = useState(false);
   const [showDonate, setShowDonate] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [animateIn, setAnimateIn] = useState(false);
@@ -32,11 +35,23 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
   };
 
   const onToggleMute = () => { const v = !muted; setMutedState(v); setMuted(v); update({ muted: v }); };
-  const onConfirmPremium = () => { setPremium(true); update({ premium: true }); setShowPremium(false); };
-  const onRestore = () => { const s = loadState(); setPremium(s.premium); alert(s.premium ? "Premium restored!" : "No previous purchase found."); };
+  const onTogglePremium = () => {
+    const v = !premium;
+    setPremium(v);
+    update({ premium: v });
+    // If turning off premium while using a premium-only back, revert to default
+    if (!v && PREMIUM_CARD_BACKS.includes(cardBack)) {
+      setCardBack("default"); update({ cardBack: "default" });
+    }
+  };
   const onReset = () => { if (confirm("Reset all progress? This cannot be undone.")) { resetState(); window.location.href = "/"; } };
   const onContact = () => { window.location.href = "mailto:hello@cosmicmemory.app?subject=Cosmic%20Memory%20feedback"; };
-  const onPickCardBack = (cb: CardBack) => { setCardBack(cb); update({ cardBack: cb }); };
+  const onPickCardBack = (cb: CardBack) => {
+    if (PREMIUM_CARD_BACKS.includes(cb) && !premium) {
+      onClose(); navigate({ to: "/premium" }); return;
+    }
+    setCardBack(cb); update({ cardBack: cb });
+  };
 
   return (
     <div
@@ -47,12 +62,11 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
         className="glass w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-6 overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
         style={{
-          maxHeight: "75vh",
+          maxHeight: "80vh",
           transform: animateIn ? "translateY(0)" : "translateY(100%)",
           transition: "transform 320ms cubic-bezier(.2,.9,.3,1)",
         }}
       >
-        {/* Drag handle */}
         <div className="mx-auto h-1.5 w-12 rounded-full bg-muted-foreground/40 mb-4 sm:hidden" />
 
         <div className="flex items-center justify-between mb-4">
@@ -67,35 +81,60 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
         </Section>
 
         <Section title="Premium">
-          {premium ? (
-            <p className="text-sm text-accent">✨ Premium active — all ads removed.</p>
-          ) : (
-            <>
-              <button
-                onClick={() => setShowPremium(true)}
-                className="w-full py-3 px-5 rounded-full font-black text-white text-base relative overflow-hidden"
-                style={{
-                  background: "linear-gradient(135deg, #a855f7 0%, #ec4899 50%, #f43f5e 100%)",
-                  boxShadow: "0 10px 30px rgba(236,72,153,0.45), inset 0 1px 0 rgba(255,255,255,0.4), 0 0 22px rgba(168,85,247,0.6)",
-                }}
-              >
-                ✨ Go Premium — $4.99
-              </button>
-              <button onClick={onRestore} className="text-xs text-muted-foreground underline mt-2 w-full text-center">Restore Purchases</button>
-            </>
+          <Row label={premium ? "✨ Premium ON — testing premium UX" : "Premium OFF — testing free UX"}>
+            <PremiumToggle on={premium} onChange={onTogglePremium} />
+          </Row>
+          <p className="text-[11px] text-muted-foreground mt-2">
+            Use this toggle to preview premium vs non-premium experience.
+          </p>
+          {!premium && (
+            <button
+              onClick={() => { onClose(); navigate({ to: "/premium" }); }}
+              className="w-full mt-3 py-3 px-5 rounded-full font-black text-white text-base"
+              style={{
+                background: "linear-gradient(135deg, #a855f7 0%, #ec4899 50%, #f43f5e 100%)",
+                boxShadow: "0 10px 30px rgba(236,72,153,0.45), inset 0 1px 0 rgba(255,255,255,0.4)",
+              }}
+            >
+              ✨ See Premium Benefits
+            </button>
           )}
         </Section>
 
         <Section title="Card Backs">
           <div className="grid grid-cols-4 gap-2">
-            {(["default","galaxy","nebula","starlight"] as CardBack[]).map((cb) => (
-              <button key={cb} onClick={() => onPickCardBack(cb)}
-                className={`rounded-xl aspect-square text-xs font-semibold capitalize border-2 transition ${cardBack === cb ? "border-accent" : "border-transparent opacity-70"}`}
-                style={{ background: cb === "default" ? "linear-gradient(135deg,var(--primary),var(--accent))" : `url(/images/rewards/card-back-${cb}.jpg) center/cover` }}>
-                <span className="bg-black/40 px-1 rounded">{cb}</span>
-              </button>
-            ))}
+            {ALL_CARD_BACKS.map((cb) => {
+              const isPremium = PREMIUM_CARD_BACKS.includes(cb);
+              const locked = isPremium && !premium;
+              const active = cardBack === cb;
+              return (
+                <button
+                  key={cb}
+                  onClick={() => onPickCardBack(cb)}
+                  className={`relative rounded-xl aspect-square text-[10px] font-semibold capitalize border-2 transition overflow-hidden ${active ? "border-accent" : "border-transparent opacity-80 hover:opacity-100"}`}
+                  style={{
+                    background: cb === "default"
+                      ? "linear-gradient(135deg,var(--primary),var(--accent))"
+                      : `url(/images/rewards/card-back-${cb}.jpg) center/cover`,
+                  }}
+                  title={locked ? `${cb} — premium` : cb}
+                >
+                  <span className="absolute inset-x-0 bottom-0 bg-black/55 px-1 py-0.5 text-white">{cb}</span>
+                  {isPremium && (
+                    <span className="absolute top-1 right-1 text-[9px] px-1.5 py-0.5 rounded-full font-black"
+                      style={{
+                        background: locked ? "rgba(0,0,0,0.7)" : "linear-gradient(135deg,#a855f7,#ec4899)",
+                        color: "white",
+                        boxShadow: locked ? "none" : "0 0 10px rgba(236,72,153,0.6)",
+                      }}>
+                      {locked ? "🔒" : "✨"}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
+          <p className="text-[11px] text-muted-foreground mt-2">✨ marks premium-only designs.</p>
         </Section>
 
         <Section title="Support the Developer">
@@ -108,54 +147,30 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
         </Section>
       </div>
 
-      {showPremium && (
-        <PremiumModal onClose={() => setShowPremium(false)} onConfirm={onConfirmPremium} />
-      )}
       <DonateModal open={showDonate} onClose={() => setShowDonate(false)} />
     </div>
   );
 }
 
-function PremiumModal({ onClose, onConfirm }: { onClose: () => void; onConfirm: () => void }) {
+function PremiumToggle({ on, onChange }: { on: boolean; onChange: () => void }) {
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md p-4" onClick={onClose}>
-      <div
-        className="rounded-3xl p-7 max-w-md w-full text-center pop-in relative overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: "linear-gradient(160deg, oklch(0.25 0.12 290) 0%, oklch(0.18 0.1 320) 100%)",
-          border: "1px solid oklch(1 0 0 / 0.15)",
-          boxShadow: "0 30px 60px -10px rgba(0,0,0,0.6), 0 0 40px rgba(168,85,247,0.35)",
-        }}
-      >
-        <div className="text-5xl mb-3">✨</div>
-        <h3 className="text-2xl font-black mb-1" style={{ background: "linear-gradient(135deg,#fff,#f0abfc)", WebkitBackgroundClip: "text", color: "transparent" }}>Cosmic Premium</h3>
-        <p className="text-sm text-muted-foreground mb-5">Unlock the full cosmic experience.</p>
-
-        <ul className="text-left space-y-2 mb-6 text-sm">
-          {[
-            "🚫 No ads — ever",
-            "♾️ Unlimited boosters",
-            "🎴 Exclusive card backs",
-            "💜 Support indie development",
-          ].map((b) => (
-            <li key={b} className="glass rounded-xl px-3 py-2">{b}</li>
-          ))}
-        </ul>
-
-        <button
-          onClick={onConfirm}
-          className="w-full py-3 rounded-full font-black text-white text-base mb-2"
-          style={{
-            background: "linear-gradient(135deg, #a855f7 0%, #ec4899 50%, #f43f5e 100%)",
-            boxShadow: "0 10px 30px rgba(236,72,153,0.5), inset 0 1px 0 rgba(255,255,255,0.4)",
-          }}
-        >
-          Pay $4.99
-        </button>
-        <button onClick={onClose} className="text-xs text-muted-foreground underline w-full">Close</button>
-      </div>
-    </div>
+    <button
+      onClick={onChange}
+      role="switch"
+      aria-checked={on}
+      className="relative w-14 h-8 rounded-full transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      style={{
+        background: on
+          ? "linear-gradient(135deg,#a855f7,#ec4899)"
+          : "rgba(255,255,255,0.15)",
+        boxShadow: on ? "0 0 16px rgba(236,72,153,0.55), inset 0 1px 0 rgba(255,255,255,0.3)" : "inset 0 1px 0 rgba(255,255,255,0.08)",
+      }}
+    >
+      <span
+        className="absolute top-1 left-1 w-6 h-6 rounded-full bg-white shadow-md transition-transform"
+        style={{ transform: on ? "translateX(24px)" : "translateX(0)" }}
+      />
+    </button>
   );
 }
 
