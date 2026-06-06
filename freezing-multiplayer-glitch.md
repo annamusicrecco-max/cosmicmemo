@@ -156,3 +156,47 @@ that still freeze. Console / network observations. Realtime event log.
 
 **Open.** Root cause unconfirmed. Symptoms reliably reproducible on mobile
 Safari and desktop Chrome with throttled network.
+
+### 2026-06-06 — Lovable agent
+
+**Hypothesis:** S2 (every tap = independent round-trip with no UI lock) and S1
+(2s polling matchmaking) account for both reported symptoms.
+
+**Change:**
+- `src/routes/online-match.tsx`
+  - Added optimistic `localRevealed` + `flipPending` lock; the card button is
+    now disabled the instant a tap fires, so a burst of taps during a freeze
+    can no longer queue multiple writes.
+  - `displayRevealed = server ∪ local` shows the flip immediately, with the
+    server `revealed[]` reconciling once it arrives.
+  - Matchmaking now subscribes to `postgres_changes` INSERTs on `game_rooms`
+    (`queue:<playerId>` channel) and calls `tryJoin` the moment a room
+    appears containing this player_id. The 2s `setInterval` was widened to
+    2.5s as a fallback only.
+- `src/lib/mp-log.ts` — new structured logger (ring buffer in localStorage +
+  console mirror) with helpers `mpLog.info/warn/error/perf/time` and a
+  `summarizeMpLog()` producing flip p50/p95/max, match-wait, realtime gap
+  p95, and error/warning counts.
+- `src/components/MpDiagnostics.tsx` — new expandable Settings section that
+  renders the stats grid and last ~80 events; warns in red when flip p95
+  > 1.5s, flip max > 3s, or realtime p95 > 2s. Includes Copy logs / Clear.
+- `src/components/SettingsPanel.tsx` — mounts `<MpDiagnostics />` under a new
+  "Multiplayer" section.
+
+**Result:** Pending real-world beta numbers. Locally the burst-flip path is
+no longer reachable (button disables synchronously). Need testers to open
+Settings → Multiplayer Diagnostics after a few games and report:
+- Flip p50 / p95 / max
+- Realtime p95
+- Any red "errors" or "warnings" entries
+- The most recent ~20 log lines (Copy logs button)
+
+**Next if still slow:**
+- If realtime p95 stays high → suspect S4; investigate channel state and
+  consider broadcasting (Realtime broadcast channel) instead of relying on
+  `postgres_changes` for every flip.
+- If `match` perf entry stays > 3s with realtime listener active → suspect
+  S5; add an index on `waiting_players(joined_at)` and prune abandoned rows
+  via a TTL job.
+- If errors include `CHANNEL_ERROR` / `TIMED_OUT` → suspect Realtime
+  back-pressure or Cloud project sleep; consider compute upgrade.

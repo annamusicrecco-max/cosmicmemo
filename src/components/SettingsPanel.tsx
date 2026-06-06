@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { loadState, saveState, resetState, type CardBack, PREMIUM_CARD_BACKS } from "@/lib/game-state";
 import { setMuted } from "@/lib/audio";
 import { DonateModal } from "@/components/DonateModal";
+import { MpDiagnostics } from "@/components/MpDiagnostics";
 import { useNavigate } from "@tanstack/react-router";
 
 const ALL_CARD_BACKS: CardBack[] = ["default", "galaxy", "nebula", "starlight", "cosmos", "supernova", "aurora"];
@@ -135,6 +136,10 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
             })}
           </div>
           <p className="text-[11px] text-muted-foreground mt-2">✨ marks premium-only designs.</p>
+        </Section>
+
+        <Section title="Multiplayer">
+          <MpDiagnostics />
         </Section>
 
         <Section title="Support the Developer">
