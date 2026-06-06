@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Universe } from "@/components/Universe";
 import { Confetti } from "@/components/Confetti";
 import { GridSizeSelector, getStoredGrid } from "@/components/GridSizeSelector";
@@ -16,6 +16,7 @@ import {
 } from "@/lib/matchmake.functions";
 import { beep, vibrate } from "@/lib/game-state";
 import { toast } from "sonner";
+import { mpLog } from "@/lib/mp-log";
 
 export const Route = createFileRoute("/online-match")({
   component: OnlineMatchPage,
@@ -69,39 +70,91 @@ function OnlineMatchPage() {
   const [inviteLink, setInviteLink] = useState<string>("");
   const [opponentJoinedToasted, setOpponentJoinedToasted] = useState(false);
 
+  // --- Optimistic flip state (fixes "burst flips" + tap-while-frozen) ---
+  // localRevealed always reflects what we've optimistically shown to *this* user.
+  // It is reset whenever the server-confirmed revealed[] catches up or resets.
+  const [localRevealed, setLocalRevealed] = useState<number[]>([]);
+  const [flipPending, setFlipPending] = useState(false);
+  const localRevealedRef = useRef<number[]>([]);
+  useEffect(() => { localRevealedRef.current = localRevealed; }, [localRevealed]);
+
+  // --- Matchmaking infra ---
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const queueChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const searchStartRef = useRef<number>(0);
+  const lastUpdateAtRef = useRef<number>(0);
 
   const clearPolling = () => {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
   };
-
-  const tryJoin = async (gridLabel: string) => {
-    const res = await join({
-      data: {
-        player_id: playerId,
-        player_name: name.trim() || "Player",
-        preferred_grid: gridLabel as "2x2" | "2x3" | "3x4" | "4x4" | "4x5" | "5x6" | "6x6",
-      },
-    });
-    if (res.status === "matched" && "game_room_id" in res) {
-      clearPolling();
-      setRoomId(res.game_room_id);
-      setPhase("playing");
+  const clearQueueChannel = () => {
+    if (queueChannelRef.current) {
+      supabase.removeChannel(queueChannelRef.current);
+      queueChannelRef.current = null;
     }
   };
+
+  const tryJoin = useCallback(async (gridLabel: string, reason: string) => {
+    try {
+      const start = performance.now();
+      const res = await join({
+        data: {
+          player_id: playerId,
+          player_name: name.trim() || "Player",
+          preferred_grid: gridLabel as "2x2" | "2x3" | "3x4" | "4x4" | "4x5" | "5x6" | "6x6",
+        },
+      });
+      const ms = performance.now() - start;
+      if (ms > 1500) mpLog.warn("match", `joinMatchmaking slow (${reason})`, { ms: Math.round(ms) });
+      if (res.status === "matched" && "game_room_id" in res) {
+        const wait = searchStartRef.current ? performance.now() - searchStartRef.current : 0;
+        mpLog.perf("match", `matched via ${reason}`, wait, { roomId: res.game_room_id });
+        clearPolling();
+        clearQueueChannel();
+        setRoomId(res.game_room_id);
+        setPhase("playing");
+      }
+    } catch (e) {
+      mpLog.error("match", `tryJoin error (${reason})`, { error: (e as Error).message });
+    }
+  }, [join, playerId, name]);
 
   const startSearch = async () => {
     if (!name.trim()) { toast("Please enter your name"); return; }
     setPlayerName(name.trim());
     setAnnouncedGrid(false);
     setPhase("searching");
-    await tryJoin(grid);
-    pollRef.current = setInterval(() => tryJoin(grid), 2000);
+    searchStartRef.current = performance.now();
+    mpLog.info("match", "search started", { grid });
+
+    // Realtime: react instantly when ANY game room is created/updated involving us.
+    clearQueueChannel();
+    const ch = supabase
+      .channel(`queue:${playerId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "game_rooms" },
+        (payload) => {
+          const r = payload.new as { player_1_id?: string; player_2_id?: string };
+          if (r.player_1_id === playerId || r.player_2_id === playerId) {
+            mpLog.info("match", "realtime room insert hit", {});
+            tryJoin(grid, "realtime-insert");
+          }
+        },
+      )
+      .subscribe();
+    queueChannelRef.current = ch;
+
+    // Initial attempt + low-frequency fallback poll (in case realtime is delayed).
+    await tryJoin(grid, "initial");
+    pollRef.current = setInterval(() => tryJoin(grid, "poll"), 2500);
   };
 
   const cancelSearch = async () => {
     clearPolling();
+    clearQueueChannel();
+    mpLog.info("match", "search cancelled");
     await leave({ data: { player_id: playerId } });
     setPhase("name");
   };
@@ -111,13 +164,13 @@ function OnlineMatchPage() {
     setPlayerName(name.trim());
     setAnnouncedGrid(false);
     try {
-      const res = await createInvite({
+      const res = await mpLog.time("match", "createInviteRoom", () => createInvite({
         data: {
           player_id: playerId,
           player_name: name.trim(),
           preferred_grid: grid as "2x2" | "2x3" | "3x4" | "4x4" | "4x5" | "5x6" | "6x6",
         },
-      });
+      }));
       const link = `${window.location.origin}/online-match?invite=${res.game_room_id}`;
       setInviteLink(link);
       setRoomId(res.game_room_id);
@@ -132,13 +185,14 @@ function OnlineMatchPage() {
     if (!name.trim()) { toast("Please enter your name"); return; }
     setPlayerName(name.trim());
     try {
-      const res = await joinInvite({
-        data: { room_id: inviteId, player_id: playerId, player_name: name.trim() },
-      });
+      const res = await mpLog.time("match", "joinInviteRoom", () =>
+        joinInvite({ data: { room_id: inviteId, player_id: playerId, player_name: name.trim() } })
+      );
       setRoomId(res.game_room_id);
       setAnnouncedGrid(false);
       setPhase("playing");
     } catch (e) {
+      mpLog.error("match", `acceptInvite failed: ${(e as Error).message}`);
       toast(`${(e as Error).message}`);
     }
   };
@@ -160,9 +214,14 @@ function OnlineMatchPage() {
     if (!roomId) return;
     let cancelled = false;
     (async () => {
+      const start = performance.now();
       const { data, error } = await supabase
         .from("game_rooms").select("*").eq("id", roomId).maybeSingle();
-      if (!cancelled && data && !error) setRoom(data as unknown as GameRoom);
+      mpLog.perf("rt", "initial room fetch", performance.now() - start, { ok: !error });
+      if (!cancelled && data && !error) {
+        setRoom(data as unknown as GameRoom);
+        lastUpdateAtRef.current = performance.now();
+      }
     })();
 
     const ch = supabase
@@ -170,9 +229,20 @@ function OnlineMatchPage() {
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "game_rooms", filter: `id=eq.${roomId}` },
-        (payload) => setRoom(payload.new as unknown as GameRoom),
+        (payload) => {
+          const now = performance.now();
+          if (lastUpdateAtRef.current) {
+            mpLog.perf("rt", "room update gap", now - lastUpdateAtRef.current);
+          }
+          lastUpdateAtRef.current = now;
+          setRoom(payload.new as unknown as GameRoom);
+        },
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          mpLog.warn("rt", `channel status: ${status}`);
+        }
+      });
     channelRef.current = ch;
 
     return () => {
@@ -182,12 +252,24 @@ function OnlineMatchPage() {
     };
   }, [roomId]);
 
+  // Reset optimistic state when server-confirmed revealed[] catches up or resets.
+  useEffect(() => {
+    if (!room) return;
+    const serverRevealed = Array.isArray(room.revealed) ? room.revealed : [];
+    const local = localRevealedRef.current;
+    // Server caught up to or surpassed our optimism, or board cleared a pair.
+    if (serverRevealed.length === 0 || serverRevealed.length >= local.length) {
+      if (local.length > 0) setLocalRevealed([]);
+      if (flipPending && serverRevealed.length !== 1) setFlipPending(false);
+    }
+  }, [room, flipPending]);
+
   // Inviter notification when guest joins
   useEffect(() => {
     if (phase === "inviting" && room && room.status === "active" && !opponentJoinedToasted) {
       setOpponentJoinedToasted(true);
-      beep("match");
-      vibrate(80);
+      mpLog.info("match", "invite accepted by guest");
+      beep("match"); vibrate(80);
       toast(`🎉 ${room.player_2_name} joined! Game starting…`);
       setTimeout(() => setPhase("playing"), 600);
     }
@@ -195,7 +277,11 @@ function OnlineMatchPage() {
 
   // Cleanup on unmount
   useEffect(() => {
-    return () => { clearPolling(); leave({ data: { player_id: playerId } }).catch(() => {}); };
+    return () => {
+      clearPolling();
+      clearQueueChannel();
+      leave({ data: { player_id: playerId } }).catch(() => {});
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -219,65 +305,96 @@ function OnlineMatchPage() {
   useEffect(() => {
     if (phase === "playing" && room && !announcedGrid) {
       toast(`Grid: ${roomGridLabel} — Good luck!`);
+      mpLog.info("match", `game started on ${roomGridLabel}`);
       setAnnouncedGrid(true);
     }
   }, [phase, room, announcedGrid, roomGridLabel]);
 
+  // Computed view of what's revealed = server ∪ our optimistic taps.
+  const displayRevealed: number[] = useMemo(() => {
+    if (!room) return [];
+    const server = Array.isArray(room.revealed) ? room.revealed : [];
+    if (localRevealed.length > server.length) return localRevealed;
+    return server;
+  }, [room, localRevealed]);
+
   const flip = async (idx: number) => {
     if (!room || !isMyTurn) return;
+    if (flipPending) return; // hard lock — kills the "burst tap" backlog
     const board = room.board;
     const card = board[idx];
     if (!card || card.matched) return;
-    const revealed = Array.isArray(room.revealed) ? room.revealed : [];
-    if (revealed.includes(idx)) return;
-    if (revealed.length >= 2) return;
+    if (displayRevealed.includes(idx)) return;
+    if (displayRevealed.length >= 2) return;
 
+    const flipStart = performance.now();
     beep("click");
-    const newRevealed = [...revealed, idx];
 
-    if (newRevealed.length === 1) {
-      await supabase.from("game_rooms").update({
-        revealed: newRevealed as never, updated_at: new Date().toISOString(),
-      }).eq("id", room.id);
-      return;
-    }
+    // 1) Optimistic reveal — instant UI, lock further taps until server confirms.
+    const newLocal = [...displayRevealed, idx];
+    setLocalRevealed(newLocal);
+    setFlipPending(true);
 
-    const [a, b] = newRevealed;
-    const isMatch = board[a].emoji === board[b].emoji;
-
-    await supabase.from("game_rooms").update({
-      revealed: newRevealed as never, updated_at: new Date().toISOString(),
-    }).eq("id", room.id);
-
-    setTimeout(async () => {
-      if (isMatch) {
-        const newBoard = board.map((c, i) => (i === a || i === b ? { ...c, matched: true } : c));
-        const allMatched = newBoard.every((c) => c.matched);
-        const newMy = (iAmP1 ? room.player_1_score : room.player_2_score) + 1;
-        const updates: Record<string, unknown> = {
-          board: newBoard,
-          revealed: [],
-          [iAmP1 ? "player_1_score" : "player_2_score"]: newMy,
-          updated_at: new Date().toISOString(),
-        };
-        if (allMatched) {
-          const p1Final = iAmP1 ? newMy : room.player_1_score;
-          const p2Final = iAmP1 ? room.player_2_score : newMy;
-          updates.status = "completed";
-          updates.winner_id =
-            p1Final === p2Final ? null : p1Final > p2Final ? room.player_1_id : room.player_2_id;
-        }
-        beep("match");
-        await supabase.from("game_rooms").update(updates as never).eq("id", room.id);
-      } else {
-        beep("miss"); vibrate(50);
+    try {
+      if (newLocal.length === 1) {
         await supabase.from("game_rooms").update({
-          revealed: [],
-          current_turn: iAmP1 ? room.player_2_id : room.player_1_id,
-          updated_at: new Date().toISOString(),
+          revealed: newLocal as never, updated_at: new Date().toISOString(),
         }).eq("id", room.id);
+        mpLog.perf("flip", "first card write", performance.now() - flipStart);
+        setFlipPending(false); // ready for second tap
+        return;
       }
-    }, 900);
+
+      // Second card: write reveal, evaluate after 900ms.
+      const [a, b] = newLocal;
+      const isMatch = board[a].emoji === board[b].emoji;
+      await supabase.from("game_rooms").update({
+        revealed: newLocal as never, updated_at: new Date().toISOString(),
+      }).eq("id", room.id);
+      mpLog.perf("flip", "second card write", performance.now() - flipStart, { match: isMatch });
+
+      setTimeout(async () => {
+        try {
+          if (isMatch) {
+            const newBoard = board.map((c, i) => (i === a || i === b ? { ...c, matched: true } : c));
+            const allMatched = newBoard.every((c) => c.matched);
+            const newMy = (iAmP1 ? room.player_1_score : room.player_2_score) + 1;
+            const updates: Record<string, unknown> = {
+              board: newBoard,
+              revealed: [],
+              [iAmP1 ? "player_1_score" : "player_2_score"]: newMy,
+              updated_at: new Date().toISOString(),
+            };
+            if (allMatched) {
+              const p1Final = iAmP1 ? newMy : room.player_1_score;
+              const p2Final = iAmP1 ? room.player_2_score : newMy;
+              updates.status = "completed";
+              updates.winner_id =
+                p1Final === p2Final ? null : p1Final > p2Final ? room.player_1_id : room.player_2_id;
+              mpLog.info("match", "game completed", { p1Final, p2Final });
+            }
+            beep("match");
+            await supabase.from("game_rooms").update(updates as never).eq("id", room.id);
+          } else {
+            beep("miss"); vibrate(50);
+            await supabase.from("game_rooms").update({
+              revealed: [],
+              current_turn: iAmP1 ? room.player_2_id : room.player_1_id,
+              updated_at: new Date().toISOString(),
+            }).eq("id", room.id);
+          }
+        } catch (e) {
+          mpLog.error("flip", `resolve failed: ${(e as Error).message}`);
+        } finally {
+          setLocalRevealed([]);
+          setFlipPending(false);
+        }
+      }, 900);
+    } catch (e) {
+      mpLog.error("flip", `write failed: ${(e as Error).message}`);
+      setLocalRevealed([]);
+      setFlipPending(false);
+    }
   };
 
   const exit = async () => {
@@ -296,7 +413,6 @@ function OnlineMatchPage() {
   const cancelInvite = async () => {
     if (room) await supabase.from("game_rooms").update({ status: "abandoned" }).eq("id", room.id);
     setRoomId(null); setRoom(null); setInviteLink(""); setPhase("name");
-    // also clear ?invite from URL
     if (inviteIdFromUrl) window.history.replaceState(null, "", "/online-match");
   };
 
@@ -420,13 +536,14 @@ function OnlineMatchPage() {
           <div className="flex items-center justify-center p-4">
             <div className="grid gap-2 sm:gap-3 w-full max-w-[min(92vw,90vh)]" style={gridStyle(roomGrid.cols)}>
               {room.board.map((c, i) => {
-                const revealed = (Array.isArray(room.revealed) ? room.revealed : []).includes(i);
+                const revealed = displayRevealed.includes(i);
                 const showFront = revealed || c.matched;
+                const disabled = !isMyTurn || c.matched || revealed || flipPending || displayRevealed.length >= 2;
                 return (
                   <button
                     key={i}
                     onClick={() => flip(i)}
-                    disabled={!isMyTurn || c.matched || revealed}
+                    disabled={disabled}
                     className="relative aspect-square w-full rounded-2xl"
                     style={{ perspective: "800px" }}
                   >
