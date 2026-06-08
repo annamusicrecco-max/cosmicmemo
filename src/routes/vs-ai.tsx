@@ -260,10 +260,14 @@ function VsAIPage() {
             </div>
           </div>
 
-          <div className="flex justify-center gap-2 pb-6">
+          <div className="flex justify-center gap-2 pb-4">
             <button onClick={reset} className="glass rounded-full px-4 py-2 text-sm font-semibold">Reset Game</button>
             <Link to="/levels" className="glass rounded-full px-4 py-2 text-sm font-semibold">Back to Map</Link>
           </div>
+
+          <AiChat humanName={name} humanScore={scores[0]} aiScore={scores[1]} />
+
+
 
           {allMatched && (
             <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-background/70 backdrop-blur-sm">
