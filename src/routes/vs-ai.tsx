@@ -7,6 +7,7 @@ import { GridSizeSelector, getStoredGrid } from "@/components/GridSizeSelector";
 import { getGrid, gridStyle } from "@/lib/grid-sizes";
 import { beep, vibrate } from "@/lib/game-state";
 import { pickAiMove } from "@/lib/vs-ai.functions";
+import { MatchChat } from "@/components/MatchChat";
 
 export const Route = createFileRoute("/vs-ai")({
   component: VsAIPage,
