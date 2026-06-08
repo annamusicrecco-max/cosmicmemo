@@ -17,6 +17,7 @@ import {
 import { beep, vibrate } from "@/lib/game-state";
 import { toast } from "sonner";
 import { mpLog } from "@/lib/mp-log";
+import { MatchChat } from "@/components/MatchChat";
 
 export const Route = createFileRoute("/online-match")({
   component: OnlineMatchPage,
@@ -584,6 +585,16 @@ function OnlineMatchPage() {
             )}
           </div>
         </>
+      )}
+
+      {phase === "playing" && room && room.status === "active" && (
+        <MatchChat
+          mode="online"
+          roomId={room.id}
+          playerId={playerId}
+          playerName={myName}
+          opponentName={oppName}
+        />
       )}
     </main>
   );
