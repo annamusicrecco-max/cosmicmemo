@@ -43,9 +43,9 @@ export function AiChat({
           message: text,
         },
       });
-      setMsgs((m) => [...m, { id: crypto.randomUUID(), role: "ai", text: res.reply }].slice(-30));
+      setMsgs((m) => [...m, { id: crypto.randomUUID(), role: "ai" as const, text: res.reply }].slice(-30));
     } catch {
-      setMsgs((m) => [...m, { id: crypto.randomUUID(), role: "ai", text: "..." }].slice(-30));
+      setMsgs((m) => [...m, { id: crypto.randomUUID(), role: "ai" as const, text: "..." }].slice(-30));
     } finally {
       setThinking(false);
     }
