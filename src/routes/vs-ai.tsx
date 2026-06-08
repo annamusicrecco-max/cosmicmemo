@@ -7,7 +7,7 @@ import { GridSizeSelector, getStoredGrid } from "@/components/GridSizeSelector";
 import { getGrid, gridStyle } from "@/lib/grid-sizes";
 import { beep, vibrate } from "@/lib/game-state";
 import { pickAiMove } from "@/lib/vs-ai.functions";
-import { MatchChat } from "@/components/MatchChat";
+import { AiChat } from "@/components/AiChat";
 
 export const Route = createFileRoute("/vs-ai")({
   component: VsAIPage,
@@ -260,10 +260,14 @@ function VsAIPage() {
             </div>
           </div>
 
-          <div className="flex justify-center gap-2 pb-6">
+          <div className="flex justify-center gap-2 pb-4">
             <button onClick={reset} className="glass rounded-full px-4 py-2 text-sm font-semibold">Reset Game</button>
             <Link to="/levels" className="glass rounded-full px-4 py-2 text-sm font-semibold">Back to Map</Link>
           </div>
+
+          <AiChat humanName={name} humanScore={scores[0]} aiScore={scores[1]} />
+
+
 
           {allMatched && (
             <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-background/70 backdrop-blur-sm">
@@ -278,10 +282,6 @@ function VsAIPage() {
             </div>
           )}
         </>
-      )}
-
-      {phase === "play" && !allMatched && (
-        <MatchChat mode="ai" playerName={name} gameContext={{ humanScore: scores[0], aiScore: scores[1] }} />
       )}
     </main>
   );

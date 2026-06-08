@@ -564,6 +564,16 @@ function OnlineMatchPage() {
             </div>
           </div>
 
+
+          <MatchChat
+            roomId={room.id}
+            playerId={playerId}
+            playerName={myName}
+            opponentName={oppName}
+            disabled={room.status !== "active"}
+          />
+
+
           <div className="flex justify-center gap-2 pb-6">
             {room.status !== "active" ? (
               <>
@@ -585,16 +595,6 @@ function OnlineMatchPage() {
             )}
           </div>
         </>
-      )}
-
-      {phase === "playing" && room && room.status === "active" && (
-        <MatchChat
-          mode="online"
-          roomId={room.id}
-          playerId={playerId}
-          playerName={myName}
-          opponentName={oppName}
-        />
       )}
     </main>
   );
