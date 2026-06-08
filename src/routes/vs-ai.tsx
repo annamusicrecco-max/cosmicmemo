@@ -279,6 +279,12 @@ function VsAIPage() {
           )}
         </>
       )}
+        </>
+      )}
+
+      {phase === "play" && !allMatched && (
+        <MatchChat mode="ai" playerName={name} gameContext={{ humanScore: scores[0], aiScore: scores[1] }} />
+      )}
     </main>
   );
 }
