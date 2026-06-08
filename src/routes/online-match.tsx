@@ -561,7 +561,9 @@ function OnlineMatchPage() {
                   </button>
                 );
               })}
+            </div>
           </div>
+
 
           <MatchChat
             roomId={room.id}
