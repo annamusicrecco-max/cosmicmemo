@@ -167,3 +167,131 @@ export const joinInviteRoom = createServerFn({ method: "POST" })
 
     return { game_room_id: room.id, role: "guest" as const };
   });
+
+// --------- Third-player invite flow ---------
+
+function gen6DigitCode(): string {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+const RequestThirdSchema = z.object({
+  room_id: z.string().uuid(),
+  requester_id: z.string().min(4).max(64),
+});
+
+export const requestThirdInvite = createServerFn({ method: "POST" })
+  .inputValidator((input) => RequestThirdSchema.parse(input))
+  .handler(async ({ data }) => {
+    const { room_id, requester_id } = data;
+    const { data: room, error } = await supabaseAdmin
+      .from("game_rooms")
+      .select("id, player_1_id, player_2_id, player_3_id, status")
+      .eq("id", room_id)
+      .maybeSingle();
+    if (error || !room) throw new Error("Room not found");
+    if (room.status !== "active") throw new Error("Room is not active");
+    if (room.player_3_id) throw new Error("Third player already joined");
+    if (room.player_1_id !== requester_id && room.player_2_id !== requester_id) {
+      throw new Error("You are not in this room");
+    }
+    await supabaseAdmin
+      .from("game_rooms")
+      .update({
+        invite_third_requester: requester_id,
+        invite_third_status: "pending",
+        invite_code: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", room_id);
+    return { ok: true };
+  });
+
+const RespondThirdSchema = z.object({
+  room_id: z.string().uuid(),
+  responder_id: z.string().min(4).max(64),
+  accept: z.boolean(),
+});
+
+export const respondThirdInvite = createServerFn({ method: "POST" })
+  .inputValidator((input) => RespondThirdSchema.parse(input))
+  .handler(async ({ data }) => {
+    const { room_id, responder_id, accept } = data;
+    const { data: room, error } = await supabaseAdmin
+      .from("game_rooms")
+      .select("id, player_1_id, player_2_id, invite_third_requester, invite_third_status, player_3_id")
+      .eq("id", room_id)
+      .maybeSingle();
+    if (error || !room) throw new Error("Room not found");
+    if (room.player_3_id) throw new Error("Third player already joined");
+    if (room.invite_third_status !== "pending") throw new Error("No pending invite");
+    if (room.invite_third_requester === responder_id) throw new Error("Requester cannot respond");
+    if (room.player_1_id !== responder_id && room.player_2_id !== responder_id) {
+      throw new Error("You are not in this room");
+    }
+    if (!accept) {
+      await supabaseAdmin
+        .from("game_rooms")
+        .update({
+          invite_third_status: "denied",
+          invite_third_requester: null,
+          invite_code: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", room_id);
+      return { ok: true, accepted: false as const };
+    }
+    // Generate a unique 6-digit code (retry a few times if collision).
+    let code = gen6DigitCode();
+    for (let i = 0; i < 5; i++) {
+      const { data: clash } = await supabaseAdmin
+        .from("game_rooms").select("id").eq("invite_code", code).maybeSingle();
+      if (!clash) break;
+      code = gen6DigitCode();
+    }
+    await supabaseAdmin
+      .from("game_rooms")
+      .update({
+        invite_third_status: "accepted",
+        invite_code: code,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", room_id);
+    return { ok: true, accepted: true as const, code };
+  });
+
+const JoinByCodeSchema = z.object({
+  code: z.string().regex(/^\d{6}$/),
+  player_id: z.string().min(4).max(64),
+  player_name: z.string().min(1).max(20),
+});
+
+export const joinRoomByCode = createServerFn({ method: "POST" })
+  .inputValidator((input) => JoinByCodeSchema.parse(input))
+  .handler(async ({ data }) => {
+    const { code, player_id, player_name } = data;
+    const { data: room, error } = await supabaseAdmin
+      .from("game_rooms")
+      .select("id, status, player_1_id, player_2_id, player_3_id, invite_third_status")
+      .eq("invite_code", code)
+      .maybeSingle();
+    if (error || !room) throw new Error("Invalid or expired code");
+    if (room.status !== "active") throw new Error("Game is no longer active");
+    if (room.player_3_id) throw new Error("Third seat already taken");
+    if (room.invite_third_status !== "accepted") throw new Error("Invite not accepted yet");
+    if (room.player_1_id === player_id || room.player_2_id === player_id) {
+      throw new Error("You are already in this room");
+    }
+    const { error: updErr } = await supabaseAdmin
+      .from("game_rooms")
+      .update({
+        player_3_id: player_id,
+        player_3_name: player_name,
+        invite_third_status: "joined",
+        invite_code: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", room.id)
+      .is("player_3_id", null);
+    if (updErr) throw new Error(updErr.message);
+    return { game_room_id: room.id };
+  });
