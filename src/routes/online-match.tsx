@@ -614,20 +614,67 @@ function OnlineMatchPage() {
       {phase === "playing" && room && (
         <>
           <div className="flex items-center justify-center gap-2 px-4 mt-3 flex-wrap">
-            <PlayerBadge name={`${myName} (You)`} score={myScore} active={!!isMyTurn} />
-            <span className="text-xs text-muted-foreground">vs</span>
-            <PlayerBadge name={oppName} score={oppScore} active={!isMyTurn && room.status === "active"} />
+            {playerOrder.map((p) => (
+              <PlayerBadge
+                key={p.id}
+                name={p.id === playerId ? `${p.name} (You)` : p.name}
+                score={p.score}
+                active={room.current_turn === p.id && room.status === "active"}
+              />
+            ))}
           </div>
 
           <div className="text-center mt-2 text-sm font-semibold text-accent">
             {room.status === "completed"
               ? room.winner_id === playerId ? "🏆 You win!"
                 : room.winner_id === null ? "It's a tie!"
-                : `${oppName} wins`
-              : room.status === "abandoned" ? "Opponent left — you win"
-              : isMyTurn ? "Your turn" : `${oppName}'s turn`}
+                : `${playerOrder.find((p) => p.id === room.winner_id)?.name ?? "Opponent"} wins`
+              : room.status === "abandoned" ? "Match ended"
+              : isMyTurn ? "Your turn" : `${activeName}'s turn`}
             <span className="ml-2 text-[11px] text-muted-foreground">· Grid {roomGridLabel}</span>
           </div>
+
+          {/* Third player controls */}
+          {room.status === "active" && !room.player_3_id && (
+            <div className="flex items-center justify-center gap-2 mt-3 px-4 flex-wrap">
+              {!thirdRequestPending && !thirdAcceptedCode && (
+                <button
+                  onClick={requestThird}
+                  className="glass rounded-full px-4 py-2 text-xs font-semibold"
+                  title="Invite a third player"
+                >
+                  ➕ Invite 3rd Player
+                </button>
+              )}
+              {thirdAcceptedCode && (
+                <div className="glass rounded-full px-4 py-2 text-xs font-semibold flex items-center gap-2">
+                  <span>Code:</span>
+                  <span className="font-mono text-accent tracking-widest">{thirdAcceptedCode}</span>
+                  <button onClick={copyThirdCode} className="underline">Copy</button>
+                </div>
+              )}
+              {thirdRequestPending && iAmRequester && !thirdAcceptedCode && (
+                <span className="text-xs text-muted-foreground">Waiting for approval…</span>
+              )}
+            </div>
+          )}
+
+          {/* Responder modal */}
+          {iAmResponder && thirdRespondedFor !== room.id && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/70 backdrop-blur-sm">
+              <div className="glass rounded-3xl p-6 max-w-sm w-full text-center pop-in">
+                <div className="text-4xl mb-2">➕</div>
+                <h3 className="text-lg font-black mb-1">Invite 3rd Player?</h3>
+                <p className="text-xs text-muted-foreground mb-4">
+                  {playerOrder.find((p) => p.id === room.invite_third_requester)?.name || "Your opponent"} wants to invite a third player to this match.
+                </p>
+                <div className="flex gap-2">
+                  <button onClick={() => respondThird(false)} className="flex-1 glass rounded-full py-2.5 text-sm font-semibold">Deny</button>
+                  <button onClick={() => respondThird(true)} className="flex-1 btn-cosmic !py-2.5 text-sm">Accept</button>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="flex items-center justify-center p-4">
             <div className="grid gap-2 sm:gap-3 w-full max-w-[min(92vw,90vh)]" style={gridStyle(roomGrid.cols)}>
@@ -664,9 +711,11 @@ function OnlineMatchPage() {
             roomId={room.id}
             playerId={playerId}
             playerName={myName}
-            opponentName={oppName}
+            opponentName={playerOrder.filter((p) => p.id !== playerId).map((p) => p.name).join(" & ") || "Opponents"}
             disabled={room.status !== "active"}
           />
+
+
 
 
           <div className="flex justify-center gap-2 pb-6">
