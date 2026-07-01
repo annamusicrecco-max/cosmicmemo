@@ -307,14 +307,40 @@ function OnlineMatchPage() {
     }
   }, [room?.status, room?.winner_id, playerId, confetti]);
 
+  const playerOrder = useMemo(() => {
+    if (!room) return [] as { id: string; name: string; score: number }[];
+    const arr = [
+      { id: room.player_1_id, name: room.player_1_name, score: room.player_1_score },
+      { id: room.player_2_id, name: room.player_2_name, score: room.player_2_score },
+    ];
+    if (room.player_3_id) {
+      arr.push({ id: room.player_3_id, name: room.player_3_name || "Player 3", score: room.player_3_score });
+    }
+    return arr.filter((p) => p.id && p.id !== "__waiting__");
+  }, [room]);
+  const nextPlayerId = (currentId: string): string => {
+    if (playerOrder.length === 0) return currentId;
+    const i = playerOrder.findIndex((p) => p.id === currentId);
+    return playerOrder[(i + 1 + playerOrder.length) % playerOrder.length].id;
+  };
   const isMyTurn = room && room.current_turn === playerId && room.status === "active";
   const iAmP1 = room && room.player_1_id === playerId;
-  const myScore = room ? (iAmP1 ? room.player_1_score : room.player_2_score) : 0;
-  const oppScore = room ? (iAmP1 ? room.player_2_score : room.player_1_score) : 0;
-  const myName = room ? (iAmP1 ? room.player_1_name : room.player_2_name) : name;
-  const oppName = room ? (iAmP1 ? room.player_2_name : room.player_1_name) : "Opponent";
+  const iAmP2 = room && room.player_2_id === playerId;
+  const iAmP3 = room && room.player_3_id === playerId;
+  const myScore = room ? (iAmP1 ? room.player_1_score : iAmP2 ? room.player_2_score : room.player_3_score) : 0;
+  const myName = room ? (iAmP1 ? room.player_1_name : iAmP2 ? room.player_2_name : room.player_3_name || name) : name;
+  const activeName = room ? (playerOrder.find((p) => p.id === room.current_turn)?.name ?? "Opponent") : "Opponent";
   const roomGridLabel = room?.grid_size || "4x4";
   const roomGrid = getGrid(roomGridLabel);
+  const scoreKey = iAmP1 ? "player_1_score" : iAmP2 ? "player_2_score" : "player_3_score";
+  // Third-invite UX state
+  const thirdRequestPending = !!(room && room.invite_third_status === "pending" && room.invite_third_requester);
+  const iAmRequester = !!(room && room.invite_third_requester === playerId);
+  const iAmResponder = !!(
+    room && thirdRequestPending && !iAmRequester &&
+    (room.player_1_id === playerId || room.player_2_id === playerId)
+  );
+  const thirdAcceptedCode = room && room.invite_third_status === "accepted" ? room.invite_code : null;
 
   useEffect(() => {
     if (phase === "playing" && room && !announcedGrid) {
