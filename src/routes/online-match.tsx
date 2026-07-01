@@ -13,6 +13,7 @@ import {
 import {
   joinMatchmaking, leaveMatchmaking,
   createInviteRoom, joinInviteRoom,
+  requestThirdInvite, respondThirdInvite, joinRoomByCode,
 } from "@/lib/matchmake.functions";
 import { beep, vibrate } from "@/lib/game-state";
 import { toast } from "sonner";
@@ -35,6 +36,9 @@ type GameRoom = {
   player_2_id: string;
   player_1_name: string;
   player_2_name: string;
+  player_3_id: string | null;
+  player_3_name: string | null;
+  player_3_score: number;
   status: string;
   current_turn: string;
   board: BoardCard[];
@@ -43,6 +47,9 @@ type GameRoom = {
   player_2_score: number;
   winner_id: string | null;
   grid_size: string;
+  invite_code: string | null;
+  invite_third_requester: string | null;
+  invite_third_status: string | null;
 };
 
 type Phase = "name" | "searching" | "inviting" | "playing";
