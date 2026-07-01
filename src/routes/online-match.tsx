@@ -398,20 +398,23 @@ function OnlineMatchPage() {
           if (isMatch) {
             const newBoard = board.map((c, i) => (i === a || i === b ? { ...c, matched: true } : c));
             const allMatched = newBoard.every((c) => c.matched);
-            const newMy = (iAmP1 ? room.player_1_score : room.player_2_score) + 1;
+            const newMy = myScore + 1;
             const updates: Record<string, unknown> = {
               board: newBoard,
               revealed: [],
-              [iAmP1 ? "player_1_score" : "player_2_score"]: newMy,
+              [scoreKey]: newMy,
               updated_at: new Date().toISOString(),
             };
             if (allMatched) {
-              const p1Final = iAmP1 ? newMy : room.player_1_score;
-              const p2Final = iAmP1 ? room.player_2_score : newMy;
+              const finals = playerOrder.map((p) => ({
+                id: p.id,
+                score: p.id === playerId ? newMy : p.score,
+              }));
+              const top = Math.max(...finals.map((f) => f.score));
+              const winners = finals.filter((f) => f.score === top);
               updates.status = "completed";
-              updates.winner_id =
-                p1Final === p2Final ? null : p1Final > p2Final ? room.player_1_id : room.player_2_id;
-              mpLog.info("match", "game completed", { p1Final, p2Final });
+              updates.winner_id = winners.length === 1 ? winners[0].id : null;
+              mpLog.info("match", "game completed", { finals });
             }
             beep("match");
             await supabase.from("game_rooms").update(updates as never).eq("id", room.id);
@@ -419,7 +422,7 @@ function OnlineMatchPage() {
             beep("miss"); vibrate(50);
             await supabase.from("game_rooms").update({
               revealed: [],
-              current_turn: iAmP1 ? room.player_2_id : room.player_1_id,
+              current_turn: nextPlayerId(playerId),
               updated_at: new Date().toISOString(),
             }).eq("id", room.id);
           }
