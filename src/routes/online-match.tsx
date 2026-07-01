@@ -60,6 +60,9 @@ function OnlineMatchPage() {
   const leave = useServerFn(leaveMatchmaking);
   const createInvite = useServerFn(createInviteRoom);
   const joinInvite = useServerFn(joinInviteRoom);
+  const reqThird = useServerFn(requestThirdInvite);
+  const respThird = useServerFn(respondThirdInvite);
+  const joinByCode = useServerFn(joinRoomByCode);
 
   const inviteIdFromUrl = useMemo(() => {
     if (typeof window === "undefined") return null;
@@ -77,6 +80,9 @@ function OnlineMatchPage() {
   const [announcedGrid, setAnnouncedGrid] = useState(false);
   const [inviteLink, setInviteLink] = useState<string>("");
   const [opponentJoinedToasted, setOpponentJoinedToasted] = useState(false);
+  const [joinCode, setJoinCode] = useState("");
+  const [thirdRespondedFor, setThirdRespondedFor] = useState<string | null>(null);
+  const [thirdJoinedToasted, setThirdJoinedToasted] = useState(false);
 
   // --- Optimistic flip state (fixes "burst flips" + tap-while-frozen) ---
   // localRevealed always reflects what we've optimistically shown to *this* user.
