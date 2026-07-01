@@ -442,9 +442,13 @@ function OnlineMatchPage() {
 
   const exit = async () => {
     if (room && room.status === "active") {
+      // Winner among remaining players = leader by score (nulled if tie)
+      const remaining = playerOrder.filter((p) => p.id !== playerId);
+      const top = remaining.reduce((m, p) => Math.max(m, p.score), -1);
+      const winners = remaining.filter((p) => p.score === top);
       await supabase.from("game_rooms").update({
         status: "abandoned",
-        winner_id: iAmP1 ? room.player_2_id : room.player_1_id,
+        winner_id: winners.length === 1 ? winners[0].id : null,
       }).eq("id", room.id);
     }
     if (room && room.status === "waiting") {
@@ -452,6 +456,55 @@ function OnlineMatchPage() {
     }
     navigate({ to: "/levels" });
   };
+
+  // --- Third player invite actions ---
+  const requestThird = async () => {
+    if (!room) return;
+    try {
+      await reqThird({ data: { room_id: room.id, requester_id: playerId } });
+      toast("Invite request sent — waiting for approval.");
+    } catch (e) { toast((e as Error).message); }
+  };
+  const respondThird = async (accept: boolean) => {
+    if (!room) return;
+    setThirdRespondedFor(room.id);
+    try {
+      const res = await respThird({ data: { room_id: room.id, responder_id: playerId, accept } });
+      toast(accept && "code" in res ? `Code generated: ${res.code}` : accept ? "Accepted" : "Declined");
+    } catch (e) { toast((e as Error).message); setThirdRespondedFor(null); }
+  };
+  const copyThirdCode = async () => {
+    if (!thirdAcceptedCode) return;
+    try { await navigator.clipboard.writeText(thirdAcceptedCode); toast("Code copied!"); }
+    catch { toast(thirdAcceptedCode); }
+  };
+  const submitJoinCode = async () => {
+    if (!name.trim()) { toast("Please enter your name"); return; }
+    if (!/^\d{6}$/.test(joinCode.trim())) { toast("Enter a 6-digit code"); return; }
+    setPlayerName(name.trim());
+    try {
+      const res = await joinByCode({
+        data: { code: joinCode.trim(), player_id: playerId, player_name: name.trim() },
+      });
+      setRoomId(res.game_room_id);
+      setAnnouncedGrid(false);
+      setPhase("playing");
+    } catch (e) { toast((e as Error).message); }
+  };
+
+  // Reset third-response guard when status changes
+  useEffect(() => {
+    if (room && room.invite_third_status !== "pending") setThirdRespondedFor(null);
+  }, [room?.invite_third_status]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Toast host when 3rd player actually joins
+  useEffect(() => {
+    if (room && room.player_3_id && !thirdJoinedToasted) {
+      setThirdJoinedToasted(true);
+      toast(`🎉 ${room.player_3_name || "Player 3"} joined the match!`);
+      beep("match");
+    }
+  }, [room?.player_3_id, room?.player_3_name, thirdJoinedToasted]);
 
   const cancelInvite = async () => {
     if (room) await supabase.from("game_rooms").update({ status: "abandoned" }).eq("id", room.id);
