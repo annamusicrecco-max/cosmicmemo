@@ -570,6 +570,28 @@ function OnlineMatchPage() {
                 >
                   🔗 Invite a Friend
                 </button>
+
+                <div className="pt-3 mt-2 border-t border-white/10">
+                  <label className="text-xs uppercase tracking-widest text-accent">Join with 6-digit code</label>
+                  <div className="flex gap-2 mt-1">
+                    <input
+                      value={joinCode}
+                      onChange={(e) => setJoinCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      inputMode="numeric"
+                      className="flex-1 px-4 py-3 rounded-xl bg-background/40 border border-white/15 focus:outline-none focus:border-accent text-sm font-mono tracking-widest text-center"
+                      placeholder="000000"
+                    />
+                    <button
+                      onClick={submitJoinCode}
+                      className="btn-cosmic !px-4 !py-3 text-sm"
+                    >
+                      Join
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Enter a code shared by the host to join as the 3rd player.
+                  </p>
+                </div>
               </div>
             )}
           </div>
