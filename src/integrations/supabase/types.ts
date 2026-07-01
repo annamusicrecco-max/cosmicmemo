@@ -21,12 +21,18 @@ export type Database = {
           current_turn: string
           grid_size: string
           id: string
+          invite_code: string | null
+          invite_third_requester: string | null
+          invite_third_status: string | null
           player_1_id: string
           player_1_name: string
           player_1_score: number
           player_2_id: string
           player_2_name: string
           player_2_score: number
+          player_3_id: string | null
+          player_3_name: string | null
+          player_3_score: number
           revealed: Json
           status: string
           updated_at: string
@@ -38,12 +44,18 @@ export type Database = {
           current_turn: string
           grid_size?: string
           id?: string
+          invite_code?: string | null
+          invite_third_requester?: string | null
+          invite_third_status?: string | null
           player_1_id: string
           player_1_name?: string
           player_1_score?: number
           player_2_id: string
           player_2_name?: string
           player_2_score?: number
+          player_3_id?: string | null
+          player_3_name?: string | null
+          player_3_score?: number
           revealed?: Json
           status?: string
           updated_at?: string
@@ -55,12 +67,18 @@ export type Database = {
           current_turn?: string
           grid_size?: string
           id?: string
+          invite_code?: string | null
+          invite_third_requester?: string | null
+          invite_third_status?: string | null
           player_1_id?: string
           player_1_name?: string
           player_1_score?: number
           player_2_id?: string
           player_2_name?: string
           player_2_score?: number
+          player_3_id?: string | null
+          player_3_name?: string | null
+          player_3_score?: number
           revealed?: Json
           status?: string
           updated_at?: string

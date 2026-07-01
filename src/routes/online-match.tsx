@@ -13,6 +13,7 @@ import {
 import {
   joinMatchmaking, leaveMatchmaking,
   createInviteRoom, joinInviteRoom,
+  requestThirdInvite, respondThirdInvite, joinRoomByCode,
 } from "@/lib/matchmake.functions";
 import { beep, vibrate } from "@/lib/game-state";
 import { toast } from "sonner";
@@ -35,6 +36,9 @@ type GameRoom = {
   player_2_id: string;
   player_1_name: string;
   player_2_name: string;
+  player_3_id: string | null;
+  player_3_name: string | null;
+  player_3_score: number;
   status: string;
   current_turn: string;
   board: BoardCard[];
@@ -43,6 +47,9 @@ type GameRoom = {
   player_2_score: number;
   winner_id: string | null;
   grid_size: string;
+  invite_code: string | null;
+  invite_third_requester: string | null;
+  invite_third_status: string | null;
 };
 
 type Phase = "name" | "searching" | "inviting" | "playing";
@@ -53,6 +60,9 @@ function OnlineMatchPage() {
   const leave = useServerFn(leaveMatchmaking);
   const createInvite = useServerFn(createInviteRoom);
   const joinInvite = useServerFn(joinInviteRoom);
+  const reqThird = useServerFn(requestThirdInvite);
+  const respThird = useServerFn(respondThirdInvite);
+  const joinByCode = useServerFn(joinRoomByCode);
 
   const inviteIdFromUrl = useMemo(() => {
     if (typeof window === "undefined") return null;
@@ -70,6 +80,9 @@ function OnlineMatchPage() {
   const [announcedGrid, setAnnouncedGrid] = useState(false);
   const [inviteLink, setInviteLink] = useState<string>("");
   const [opponentJoinedToasted, setOpponentJoinedToasted] = useState(false);
+  const [joinCode, setJoinCode] = useState("");
+  const [thirdRespondedFor, setThirdRespondedFor] = useState<string | null>(null);
+  const [thirdJoinedToasted, setThirdJoinedToasted] = useState(false);
 
   // --- Optimistic flip state (fixes "burst flips" + tap-while-frozen) ---
   // localRevealed always reflects what we've optimistically shown to *this* user.
@@ -294,14 +307,40 @@ function OnlineMatchPage() {
     }
   }, [room?.status, room?.winner_id, playerId, confetti]);
 
+  const playerOrder = useMemo(() => {
+    if (!room) return [] as { id: string; name: string; score: number }[];
+    const arr = [
+      { id: room.player_1_id, name: room.player_1_name, score: room.player_1_score },
+      { id: room.player_2_id, name: room.player_2_name, score: room.player_2_score },
+    ];
+    if (room.player_3_id) {
+      arr.push({ id: room.player_3_id, name: room.player_3_name || "Player 3", score: room.player_3_score });
+    }
+    return arr.filter((p) => p.id && p.id !== "__waiting__");
+  }, [room]);
+  const nextPlayerId = (currentId: string): string => {
+    if (playerOrder.length === 0) return currentId;
+    const i = playerOrder.findIndex((p) => p.id === currentId);
+    return playerOrder[(i + 1 + playerOrder.length) % playerOrder.length].id;
+  };
   const isMyTurn = room && room.current_turn === playerId && room.status === "active";
   const iAmP1 = room && room.player_1_id === playerId;
-  const myScore = room ? (iAmP1 ? room.player_1_score : room.player_2_score) : 0;
-  const oppScore = room ? (iAmP1 ? room.player_2_score : room.player_1_score) : 0;
-  const myName = room ? (iAmP1 ? room.player_1_name : room.player_2_name) : name;
-  const oppName = room ? (iAmP1 ? room.player_2_name : room.player_1_name) : "Opponent";
+  const iAmP2 = room && room.player_2_id === playerId;
+  const iAmP3 = room && room.player_3_id === playerId;
+  const myScore = room ? (iAmP1 ? room.player_1_score : iAmP2 ? room.player_2_score : room.player_3_score) : 0;
+  const myName = room ? (iAmP1 ? room.player_1_name : iAmP2 ? room.player_2_name : room.player_3_name || name) : name;
+  const activeName = room ? (playerOrder.find((p) => p.id === room.current_turn)?.name ?? "Opponent") : "Opponent";
   const roomGridLabel = room?.grid_size || "4x4";
   const roomGrid = getGrid(roomGridLabel);
+  const scoreKey = iAmP1 ? "player_1_score" : iAmP2 ? "player_2_score" : "player_3_score";
+  // Third-invite UX state
+  const thirdRequestPending = !!(room && room.invite_third_status === "pending" && room.invite_third_requester);
+  const iAmRequester = !!(room && room.invite_third_requester === playerId);
+  const iAmResponder = !!(
+    room && thirdRequestPending && !iAmRequester &&
+    (room.player_1_id === playerId || room.player_2_id === playerId)
+  );
+  const thirdAcceptedCode = room && room.invite_third_status === "accepted" ? room.invite_code : null;
 
   useEffect(() => {
     if (phase === "playing" && room && !announcedGrid) {
@@ -359,20 +398,23 @@ function OnlineMatchPage() {
           if (isMatch) {
             const newBoard = board.map((c, i) => (i === a || i === b ? { ...c, matched: true } : c));
             const allMatched = newBoard.every((c) => c.matched);
-            const newMy = (iAmP1 ? room.player_1_score : room.player_2_score) + 1;
+            const newMy = myScore + 1;
             const updates: Record<string, unknown> = {
               board: newBoard,
               revealed: [],
-              [iAmP1 ? "player_1_score" : "player_2_score"]: newMy,
+              [scoreKey]: newMy,
               updated_at: new Date().toISOString(),
             };
             if (allMatched) {
-              const p1Final = iAmP1 ? newMy : room.player_1_score;
-              const p2Final = iAmP1 ? room.player_2_score : newMy;
+              const finals = playerOrder.map((p) => ({
+                id: p.id,
+                score: p.id === playerId ? newMy : p.score,
+              }));
+              const top = Math.max(...finals.map((f) => f.score));
+              const winners = finals.filter((f) => f.score === top);
               updates.status = "completed";
-              updates.winner_id =
-                p1Final === p2Final ? null : p1Final > p2Final ? room.player_1_id : room.player_2_id;
-              mpLog.info("match", "game completed", { p1Final, p2Final });
+              updates.winner_id = winners.length === 1 ? winners[0].id : null;
+              mpLog.info("match", "game completed", { finals });
             }
             beep("match");
             await supabase.from("game_rooms").update(updates as never).eq("id", room.id);
@@ -380,7 +422,7 @@ function OnlineMatchPage() {
             beep("miss"); vibrate(50);
             await supabase.from("game_rooms").update({
               revealed: [],
-              current_turn: iAmP1 ? room.player_2_id : room.player_1_id,
+              current_turn: nextPlayerId(playerId),
               updated_at: new Date().toISOString(),
             }).eq("id", room.id);
           }
@@ -400,9 +442,13 @@ function OnlineMatchPage() {
 
   const exit = async () => {
     if (room && room.status === "active") {
+      // Winner among remaining players = leader by score (nulled if tie)
+      const remaining = playerOrder.filter((p) => p.id !== playerId);
+      const top = remaining.reduce((m, p) => Math.max(m, p.score), -1);
+      const winners = remaining.filter((p) => p.score === top);
       await supabase.from("game_rooms").update({
         status: "abandoned",
-        winner_id: iAmP1 ? room.player_2_id : room.player_1_id,
+        winner_id: winners.length === 1 ? winners[0].id : null,
       }).eq("id", room.id);
     }
     if (room && room.status === "waiting") {
@@ -410,6 +456,55 @@ function OnlineMatchPage() {
     }
     navigate({ to: "/levels" });
   };
+
+  // --- Third player invite actions ---
+  const requestThird = async () => {
+    if (!room) return;
+    try {
+      await reqThird({ data: { room_id: room.id, requester_id: playerId } });
+      toast("Invite request sent — waiting for approval.");
+    } catch (e) { toast((e as Error).message); }
+  };
+  const respondThird = async (accept: boolean) => {
+    if (!room) return;
+    setThirdRespondedFor(room.id);
+    try {
+      const res = await respThird({ data: { room_id: room.id, responder_id: playerId, accept } });
+      toast(accept && "code" in res ? `Code generated: ${res.code}` : accept ? "Accepted" : "Declined");
+    } catch (e) { toast((e as Error).message); setThirdRespondedFor(null); }
+  };
+  const copyThirdCode = async () => {
+    if (!thirdAcceptedCode) return;
+    try { await navigator.clipboard.writeText(thirdAcceptedCode); toast("Code copied!"); }
+    catch { toast(thirdAcceptedCode); }
+  };
+  const submitJoinCode = async () => {
+    if (!name.trim()) { toast("Please enter your name"); return; }
+    if (!/^\d{6}$/.test(joinCode.trim())) { toast("Enter a 6-digit code"); return; }
+    setPlayerName(name.trim());
+    try {
+      const res = await joinByCode({
+        data: { code: joinCode.trim(), player_id: playerId, player_name: name.trim() },
+      });
+      setRoomId(res.game_room_id);
+      setAnnouncedGrid(false);
+      setPhase("playing");
+    } catch (e) { toast((e as Error).message); }
+  };
+
+  // Reset third-response guard when status changes
+  useEffect(() => {
+    if (room && room.invite_third_status !== "pending") setThirdRespondedFor(null);
+  }, [room?.invite_third_status]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Toast host when 3rd player actually joins
+  useEffect(() => {
+    if (room && room.player_3_id && !thirdJoinedToasted) {
+      setThirdJoinedToasted(true);
+      toast(`🎉 ${room.player_3_name || "Player 3"} joined the match!`);
+      beep("match");
+    }
+  }, [room?.player_3_id, room?.player_3_name, thirdJoinedToasted]);
 
   const cancelInvite = async () => {
     if (room) await supabase.from("game_rooms").update({ status: "abandoned" }).eq("id", room.id);
@@ -475,6 +570,28 @@ function OnlineMatchPage() {
                 >
                   🔗 Invite a Friend
                 </button>
+
+                <div className="pt-3 mt-2 border-t border-white/10">
+                  <label className="text-xs uppercase tracking-widest text-accent">Join with 6-digit code</label>
+                  <div className="flex gap-2 mt-1">
+                    <input
+                      value={joinCode}
+                      onChange={(e) => setJoinCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      inputMode="numeric"
+                      className="flex-1 px-4 py-3 rounded-xl bg-background/40 border border-white/15 focus:outline-none focus:border-accent text-sm font-mono tracking-widest text-center"
+                      placeholder="000000"
+                    />
+                    <button
+                      onClick={submitJoinCode}
+                      className="btn-cosmic !px-4 !py-3 text-sm"
+                    >
+                      Join
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Enter a code shared by the host to join as the 3rd player.
+                  </p>
+                </div>
               </div>
             )}
           </div>
@@ -519,20 +636,67 @@ function OnlineMatchPage() {
       {phase === "playing" && room && (
         <>
           <div className="flex items-center justify-center gap-2 px-4 mt-3 flex-wrap">
-            <PlayerBadge name={`${myName} (You)`} score={myScore} active={!!isMyTurn} />
-            <span className="text-xs text-muted-foreground">vs</span>
-            <PlayerBadge name={oppName} score={oppScore} active={!isMyTurn && room.status === "active"} />
+            {playerOrder.map((p) => (
+              <PlayerBadge
+                key={p.id}
+                name={p.id === playerId ? `${p.name} (You)` : p.name}
+                score={p.score}
+                active={room.current_turn === p.id && room.status === "active"}
+              />
+            ))}
           </div>
 
           <div className="text-center mt-2 text-sm font-semibold text-accent">
             {room.status === "completed"
               ? room.winner_id === playerId ? "🏆 You win!"
                 : room.winner_id === null ? "It's a tie!"
-                : `${oppName} wins`
-              : room.status === "abandoned" ? "Opponent left — you win"
-              : isMyTurn ? "Your turn" : `${oppName}'s turn`}
+                : `${playerOrder.find((p) => p.id === room.winner_id)?.name ?? "Opponent"} wins`
+              : room.status === "abandoned" ? "Match ended"
+              : isMyTurn ? "Your turn" : `${activeName}'s turn`}
             <span className="ml-2 text-[11px] text-muted-foreground">· Grid {roomGridLabel}</span>
           </div>
+
+          {/* Third player controls */}
+          {room.status === "active" && !room.player_3_id && (
+            <div className="flex items-center justify-center gap-2 mt-3 px-4 flex-wrap">
+              {!thirdRequestPending && !thirdAcceptedCode && (
+                <button
+                  onClick={requestThird}
+                  className="glass rounded-full px-4 py-2 text-xs font-semibold"
+                  title="Invite a third player"
+                >
+                  ➕ Invite 3rd Player
+                </button>
+              )}
+              {thirdAcceptedCode && (
+                <div className="glass rounded-full px-4 py-2 text-xs font-semibold flex items-center gap-2">
+                  <span>Code:</span>
+                  <span className="font-mono text-accent tracking-widest">{thirdAcceptedCode}</span>
+                  <button onClick={copyThirdCode} className="underline">Copy</button>
+                </div>
+              )}
+              {thirdRequestPending && iAmRequester && !thirdAcceptedCode && (
+                <span className="text-xs text-muted-foreground">Waiting for approval…</span>
+              )}
+            </div>
+          )}
+
+          {/* Responder modal */}
+          {iAmResponder && thirdRespondedFor !== room.id && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/70 backdrop-blur-sm">
+              <div className="glass rounded-3xl p-6 max-w-sm w-full text-center pop-in">
+                <div className="text-4xl mb-2">➕</div>
+                <h3 className="text-lg font-black mb-1">Invite 3rd Player?</h3>
+                <p className="text-xs text-muted-foreground mb-4">
+                  {playerOrder.find((p) => p.id === room.invite_third_requester)?.name || "Your opponent"} wants to invite a third player to this match.
+                </p>
+                <div className="flex gap-2">
+                  <button onClick={() => respondThird(false)} className="flex-1 glass rounded-full py-2.5 text-sm font-semibold">Deny</button>
+                  <button onClick={() => respondThird(true)} className="flex-1 btn-cosmic !py-2.5 text-sm">Accept</button>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="flex items-center justify-center p-4">
             <div className="grid gap-2 sm:gap-3 w-full max-w-[min(92vw,90vh)]" style={gridStyle(roomGrid.cols)}>
@@ -569,9 +733,11 @@ function OnlineMatchPage() {
             roomId={room.id}
             playerId={playerId}
             playerName={myName}
-            opponentName={oppName}
+            opponentName={playerOrder.filter((p) => p.id !== playerId).map((p) => p.name).join(" & ") || "Opponents"}
             disabled={room.status !== "active"}
           />
+
+
 
 
           <div className="flex justify-center gap-2 pb-6">
