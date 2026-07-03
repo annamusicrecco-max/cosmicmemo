@@ -348,6 +348,15 @@ function OnlineMatchPage() {
     (room.player_1_id === playerId || room.player_2_id === playerId)
   );
   const thirdAcceptedCode = room && room.invite_third_status === "accepted" ? room.invite_code : null;
+  const aiRequestPending = !!(room && room.invite_third_status === "ai_pending" && room.invite_third_requester);
+  const iAmAiRequester = !!(room && aiRequestPending && room.invite_third_requester === playerId);
+  const iAmAiResponder = !!(
+    room && aiRequestPending && !iAmAiRequester &&
+    (room.player_1_id === playerId || room.player_2_id === playerId)
+  );
+  const isAiPlayer3 = !!(room && room.player_3_id && room.player_3_id.startsWith("ai:"));
+  const isHost = !!(room && room.player_1_id === playerId);
+
 
   useEffect(() => {
     if (phase === "playing" && room && !announcedGrid) {
