@@ -569,6 +569,21 @@ function OnlineMatchPage() {
       toast("Invite request sent — waiting for approval.");
     } catch (e) { toast((e as Error).message); }
   };
+  const requestAi = async () => {
+    if (!room) return;
+    try {
+      await reqAi({ data: { room_id: room.id, requester_id: playerId } });
+      toast("Asked opponent to add AI as 3rd player…");
+    } catch (e) { toast((e as Error).message); }
+  };
+  const respondAi = async (accept: boolean) => {
+    if (!room) return;
+    setThirdRespondedFor(room.id);
+    try {
+      await respAi({ data: { room_id: room.id, responder_id: playerId, accept } });
+      toast(accept ? "🤖 AI joined the match!" : "Declined");
+    } catch (e) { toast((e as Error).message); setThirdRespondedFor(null); }
+
   const respondThird = async (accept: boolean) => {
     if (!room) return;
     setThirdRespondedFor(room.id);
