@@ -14,7 +14,10 @@ import {
   joinMatchmaking, leaveMatchmaking,
   createInviteRoom, joinInviteRoom,
   requestThirdInvite, respondThirdInvite, joinRoomByCode,
+  requestAiThird, respondAiThird,
 } from "@/lib/matchmake.functions";
+import { pickAiMove } from "@/lib/vs-ai.functions";
+
 import { beep, vibrate } from "@/lib/game-state";
 import { toast } from "sonner";
 import { mpLog } from "@/lib/mp-log";
