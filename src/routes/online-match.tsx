@@ -781,14 +781,23 @@ function OnlineMatchPage() {
           {/* Third player controls */}
           {room.status === "active" && !room.player_3_id && (
             <div className="flex items-center justify-center gap-2 mt-3 px-4 flex-wrap">
-              {!thirdRequestPending && !thirdAcceptedCode && (
-                <button
-                  onClick={requestThird}
-                  className="glass rounded-full px-4 py-2 text-xs font-semibold"
-                  title="Invite a third player"
-                >
-                  ➕ Invite 3rd Player
-                </button>
+              {!thirdRequestPending && !thirdAcceptedCode && !aiRequestPending && (
+                <>
+                  <button
+                    onClick={requestThird}
+                    className="glass rounded-full px-4 py-2 text-xs font-semibold"
+                    title="Invite a third player"
+                  >
+                    ➕ Invite 3rd Player
+                  </button>
+                  <button
+                    onClick={requestAi}
+                    className="glass rounded-full px-4 py-2 text-xs font-semibold"
+                    title="Add AI as third player"
+                  >
+                    🤖 Add AI
+                  </button>
+                </>
               )}
               {thirdAcceptedCode && (
                 <div className="glass rounded-full px-4 py-2 text-xs font-semibold flex items-center gap-2">
@@ -800,6 +809,10 @@ function OnlineMatchPage() {
               {thirdRequestPending && iAmRequester && !thirdAcceptedCode && (
                 <span className="text-xs text-muted-foreground">Waiting for approval…</span>
               )}
+              {aiRequestPending && iAmAiRequester && (
+                <span className="text-xs text-muted-foreground">Waiting for AI approval…</span>
+              )}
+
             </div>
           )}
 
