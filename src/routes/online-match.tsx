@@ -833,6 +833,25 @@ function OnlineMatchPage() {
             </div>
           )}
 
+          {/* AI responder modal */}
+          {iAmAiResponder && thirdRespondedFor !== room.id && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/70 backdrop-blur-sm">
+              <div className="glass rounded-3xl p-6 max-w-sm w-full text-center pop-in">
+                <div className="text-4xl mb-2">🤖</div>
+                <h3 className="text-lg font-black mb-1">Add AI as 3rd Player?</h3>
+                <p className="text-xs text-muted-foreground mb-4">
+                  {playerOrder.find((p) => p.id === room.invite_third_requester)?.name || "Your opponent"} wants to add Cosmo (AI) as a third player.
+                </p>
+                <div className="flex gap-2">
+                  <button onClick={() => respondAi(false)} className="flex-1 glass rounded-full py-2.5 text-sm font-semibold">Deny</button>
+                  <button onClick={() => respondAi(true)} className="flex-1 btn-cosmic !py-2.5 text-sm">Accept</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+
+
           <div className="flex items-center justify-center p-4">
             <div className="grid gap-2 sm:gap-3 w-full max-w-[min(92vw,90vh)]" style={gridStyle(roomGrid.cols)}>
               {room.board.map((c, i) => {
