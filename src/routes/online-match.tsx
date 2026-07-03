@@ -374,6 +374,94 @@ function OnlineMatchPage() {
     return server;
   }, [room, localRevealed]);
 
+  // --- AI-as-3rd-player: memory + turn runner (host client only) ---
+  const aiMemoryRef = useRef<Record<number, string>>({});
+  useEffect(() => {
+    if (!room) return;
+    const rev = Array.isArray(room.revealed) ? room.revealed : [];
+    for (const i of rev) {
+      const c = room.board[i];
+      if (c && c.emoji) aiMemoryRef.current[i] = c.emoji;
+    }
+    room.board.forEach((c, i) => { if (c.matched && c.emoji) aiMemoryRef.current[i] = c.emoji; });
+  }, [room]);
+
+  const aiRunningRef = useRef(false);
+  useEffect(() => {
+    if (!isHost || !room || room.status !== "active") return;
+    if (!isAiPlayer3 || room.current_turn !== room.player_3_id) return;
+    if (aiRunningRef.current) return;
+    aiRunningRef.current = true;
+    const roomSnapshot = room;
+    (async () => {
+      try {
+        await new Promise((r) => setTimeout(r, 900));
+        const known = aiMemoryRef.current;
+        const boardForAi = roomSnapshot.board.map((c, pos) => ({
+          pos,
+          emoji: c.matched || known[pos] ? c.emoji : null,
+          matched: c.matched,
+        }));
+        const { first, second } = await pickAi({
+          data: {
+            board: boardForAi,
+            humanScore: Math.max(roomSnapshot.player_1_score, roomSnapshot.player_2_score),
+            aiScore: roomSnapshot.player_3_score,
+            humanName: "Players",
+            turnHistory: [],
+          },
+        });
+        const rid = roomSnapshot.id;
+        await supabase.from("game_rooms").update({
+          revealed: [first] as never, updated_at: new Date().toISOString(),
+        }).eq("id", rid);
+        await new Promise((r) => setTimeout(r, 800));
+        await supabase.from("game_rooms").update({
+          revealed: [first, second] as never, updated_at: new Date().toISOString(),
+        }).eq("id", rid);
+        await new Promise((r) => setTimeout(r, 950));
+        const isMatch = roomSnapshot.board[first]?.emoji === roomSnapshot.board[second]?.emoji;
+        if (isMatch) {
+          const newBoard = roomSnapshot.board.map((c, i) =>
+            (i === first || i === second) ? { ...c, matched: true } : c
+          );
+          const allMatched = newBoard.every((c) => c.matched);
+          const newAiScore = roomSnapshot.player_3_score + 1;
+          const updates: Record<string, unknown> = {
+            board: newBoard, revealed: [],
+            player_3_score: newAiScore,
+            updated_at: new Date().toISOString(),
+          };
+          if (allMatched) {
+            const finals = [
+              { id: roomSnapshot.player_1_id, score: roomSnapshot.player_1_score },
+              { id: roomSnapshot.player_2_id, score: roomSnapshot.player_2_score },
+              { id: roomSnapshot.player_3_id!, score: newAiScore },
+            ];
+            const top = Math.max(...finals.map((f) => f.score));
+            const winners = finals.filter((f) => f.score === top);
+            updates.status = "completed";
+            updates.winner_id = winners.length === 1 ? winners[0].id : null;
+          }
+          await supabase.from("game_rooms").update(updates as never).eq("id", rid);
+        } else {
+          await supabase.from("game_rooms").update({
+            revealed: [],
+            current_turn: nextPlayerId(roomSnapshot.player_3_id!),
+            updated_at: new Date().toISOString(),
+          }).eq("id", rid);
+        }
+      } catch (e) {
+        mpLog.error("flip", `AI turn failed: ${(e as Error).message}`);
+      } finally {
+        aiRunningRef.current = false;
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [room?.current_turn, room?.status, room?.player_3_id, isHost, isAiPlayer3]);
+
+
+
   const flip = async (idx: number) => {
     if (!room || !isMyTurn) return;
     if (flipPending) return; // hard lock — kills the "burst tap" backlog
