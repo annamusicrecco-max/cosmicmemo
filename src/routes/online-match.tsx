@@ -583,6 +583,9 @@ function OnlineMatchPage() {
       await respAi({ data: { room_id: room.id, responder_id: playerId, accept } });
       toast(accept ? "🤖 AI joined the match!" : "Declined");
     } catch (e) { toast((e as Error).message); setThirdRespondedFor(null); }
+  };
+
+
 
   const respondThird = async (accept: boolean) => {
     if (!room) return;
