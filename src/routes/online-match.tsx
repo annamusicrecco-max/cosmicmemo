@@ -66,6 +66,10 @@ function OnlineMatchPage() {
   const reqThird = useServerFn(requestThirdInvite);
   const respThird = useServerFn(respondThirdInvite);
   const joinByCode = useServerFn(joinRoomByCode);
+  const reqAi = useServerFn(requestAiThird);
+  const respAi = useServerFn(respondAiThird);
+  const pickAi = useServerFn(pickAiMove);
+
 
   const inviteIdFromUrl = useMemo(() => {
     if (typeof window === "undefined") return null;
