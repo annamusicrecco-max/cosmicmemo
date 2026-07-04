@@ -14,10 +14,7 @@ import {
   joinMatchmaking, leaveMatchmaking,
   createInviteRoom, joinInviteRoom,
   requestThirdInvite, respondThirdInvite, joinRoomByCode,
-  requestAiThird, respondAiThird,
 } from "@/lib/matchmake.functions";
-import { pickAiMove } from "@/lib/vs-ai.functions";
-
 import { beep, vibrate } from "@/lib/game-state";
 import { toast } from "sonner";
 import { mpLog } from "@/lib/mp-log";
@@ -66,10 +63,6 @@ function OnlineMatchPage() {
   const reqThird = useServerFn(requestThirdInvite);
   const respThird = useServerFn(respondThirdInvite);
   const joinByCode = useServerFn(joinRoomByCode);
-  const reqAi = useServerFn(requestAiThird);
-  const respAi = useServerFn(respondAiThird);
-  const pickAi = useServerFn(pickAiMove);
-
 
   const inviteIdFromUrl = useMemo(() => {
     if (typeof window === "undefined") return null;
@@ -348,15 +341,6 @@ function OnlineMatchPage() {
     (room.player_1_id === playerId || room.player_2_id === playerId)
   );
   const thirdAcceptedCode = room && room.invite_third_status === "accepted" ? room.invite_code : null;
-  const aiRequestPending = !!(room && room.invite_third_status === "ai_pending" && room.invite_third_requester);
-  const iAmAiRequester = !!(room && aiRequestPending && room.invite_third_requester === playerId);
-  const iAmAiResponder = !!(
-    room && aiRequestPending && !iAmAiRequester &&
-    (room.player_1_id === playerId || room.player_2_id === playerId)
-  );
-  const isAiPlayer3 = !!(room && room.player_3_id && room.player_3_id.startsWith("ai:"));
-  const isHost = !!(room && room.player_1_id === playerId);
-
 
   useEffect(() => {
     if (phase === "playing" && room && !announcedGrid) {
@@ -373,94 +357,6 @@ function OnlineMatchPage() {
     if (localRevealed.length > server.length) return localRevealed;
     return server;
   }, [room, localRevealed]);
-
-  // --- AI-as-3rd-player: memory + turn runner (host client only) ---
-  const aiMemoryRef = useRef<Record<number, string>>({});
-  useEffect(() => {
-    if (!room) return;
-    const rev = Array.isArray(room.revealed) ? room.revealed : [];
-    for (const i of rev) {
-      const c = room.board[i];
-      if (c && c.emoji) aiMemoryRef.current[i] = c.emoji;
-    }
-    room.board.forEach((c, i) => { if (c.matched && c.emoji) aiMemoryRef.current[i] = c.emoji; });
-  }, [room]);
-
-  const aiRunningRef = useRef(false);
-  useEffect(() => {
-    if (!isHost || !room || room.status !== "active") return;
-    if (!isAiPlayer3 || room.current_turn !== room.player_3_id) return;
-    if (aiRunningRef.current) return;
-    aiRunningRef.current = true;
-    const roomSnapshot = room;
-    (async () => {
-      try {
-        await new Promise((r) => setTimeout(r, 900));
-        const known = aiMemoryRef.current;
-        const boardForAi = roomSnapshot.board.map((c, pos) => ({
-          pos,
-          emoji: c.matched || known[pos] ? c.emoji : null,
-          matched: c.matched,
-        }));
-        const { first, second } = await pickAi({
-          data: {
-            board: boardForAi,
-            humanScore: Math.max(roomSnapshot.player_1_score, roomSnapshot.player_2_score),
-            aiScore: roomSnapshot.player_3_score,
-            humanName: "Players",
-            turnHistory: [],
-          },
-        });
-        const rid = roomSnapshot.id;
-        await supabase.from("game_rooms").update({
-          revealed: [first] as never, updated_at: new Date().toISOString(),
-        }).eq("id", rid);
-        await new Promise((r) => setTimeout(r, 800));
-        await supabase.from("game_rooms").update({
-          revealed: [first, second] as never, updated_at: new Date().toISOString(),
-        }).eq("id", rid);
-        await new Promise((r) => setTimeout(r, 950));
-        const isMatch = roomSnapshot.board[first]?.emoji === roomSnapshot.board[second]?.emoji;
-        if (isMatch) {
-          const newBoard = roomSnapshot.board.map((c, i) =>
-            (i === first || i === second) ? { ...c, matched: true } : c
-          );
-          const allMatched = newBoard.every((c) => c.matched);
-          const newAiScore = roomSnapshot.player_3_score + 1;
-          const updates: Record<string, unknown> = {
-            board: newBoard, revealed: [],
-            player_3_score: newAiScore,
-            updated_at: new Date().toISOString(),
-          };
-          if (allMatched) {
-            const finals = [
-              { id: roomSnapshot.player_1_id, score: roomSnapshot.player_1_score },
-              { id: roomSnapshot.player_2_id, score: roomSnapshot.player_2_score },
-              { id: roomSnapshot.player_3_id!, score: newAiScore },
-            ];
-            const top = Math.max(...finals.map((f) => f.score));
-            const winners = finals.filter((f) => f.score === top);
-            updates.status = "completed";
-            updates.winner_id = winners.length === 1 ? winners[0].id : null;
-          }
-          await supabase.from("game_rooms").update(updates as never).eq("id", rid);
-        } else {
-          await supabase.from("game_rooms").update({
-            revealed: [],
-            current_turn: nextPlayerId(roomSnapshot.player_3_id!),
-            updated_at: new Date().toISOString(),
-          }).eq("id", rid);
-        }
-      } catch (e) {
-        mpLog.error("flip", `AI turn failed: ${(e as Error).message}`);
-      } finally {
-        aiRunningRef.current = false;
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [room?.current_turn, room?.status, room?.player_3_id, isHost, isAiPlayer3]);
-
-
 
   const flip = async (idx: number) => {
     if (!room || !isMyTurn) return;
@@ -569,24 +465,6 @@ function OnlineMatchPage() {
       toast("Invite request sent — waiting for approval.");
     } catch (e) { toast((e as Error).message); }
   };
-  const requestAi = async () => {
-    if (!room) return;
-    try {
-      await reqAi({ data: { room_id: room.id, requester_id: playerId } });
-      toast("Asked opponent to add AI as 3rd player…");
-    } catch (e) { toast((e as Error).message); }
-  };
-  const respondAi = async (accept: boolean) => {
-    if (!room) return;
-    setThirdRespondedFor(room.id);
-    try {
-      await respAi({ data: { room_id: room.id, responder_id: playerId, accept } });
-      toast(accept ? "🤖 AI joined the match!" : "Declined");
-    } catch (e) { toast((e as Error).message); setThirdRespondedFor(null); }
-  };
-
-
-
   const respondThird = async (accept: boolean) => {
     if (!room) return;
     setThirdRespondedFor(room.id);
@@ -781,23 +659,14 @@ function OnlineMatchPage() {
           {/* Third player controls */}
           {room.status === "active" && !room.player_3_id && (
             <div className="flex items-center justify-center gap-2 mt-3 px-4 flex-wrap">
-              {!thirdRequestPending && !thirdAcceptedCode && !aiRequestPending && (
-                <>
-                  <button
-                    onClick={requestThird}
-                    className="glass rounded-full px-4 py-2 text-xs font-semibold"
-                    title="Invite a third player"
-                  >
-                    ➕ Invite 3rd Player
-                  </button>
-                  <button
-                    onClick={requestAi}
-                    className="glass rounded-full px-4 py-2 text-xs font-semibold"
-                    title="Add AI as third player"
-                  >
-                    🤖 Add AI
-                  </button>
-                </>
+              {!thirdRequestPending && !thirdAcceptedCode && (
+                <button
+                  onClick={requestThird}
+                  className="glass rounded-full px-4 py-2 text-xs font-semibold"
+                  title="Invite a third player"
+                >
+                  ➕ Invite 3rd Player
+                </button>
               )}
               {thirdAcceptedCode && (
                 <div className="glass rounded-full px-4 py-2 text-xs font-semibold flex items-center gap-2">
@@ -809,10 +678,6 @@ function OnlineMatchPage() {
               {thirdRequestPending && iAmRequester && !thirdAcceptedCode && (
                 <span className="text-xs text-muted-foreground">Waiting for approval…</span>
               )}
-              {aiRequestPending && iAmAiRequester && (
-                <span className="text-xs text-muted-foreground">Waiting for AI approval…</span>
-              )}
-
             </div>
           )}
 
@@ -832,25 +697,6 @@ function OnlineMatchPage() {
               </div>
             </div>
           )}
-
-          {/* AI responder modal */}
-          {iAmAiResponder && thirdRespondedFor !== room.id && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/70 backdrop-blur-sm">
-              <div className="glass rounded-3xl p-6 max-w-sm w-full text-center pop-in">
-                <div className="text-4xl mb-2">🤖</div>
-                <h3 className="text-lg font-black mb-1">Add AI as 3rd Player?</h3>
-                <p className="text-xs text-muted-foreground mb-4">
-                  {playerOrder.find((p) => p.id === room.invite_third_requester)?.name || "Your opponent"} wants to add Cosmo (AI) as a third player.
-                </p>
-                <div className="flex gap-2">
-                  <button onClick={() => respondAi(false)} className="flex-1 glass rounded-full py-2.5 text-sm font-semibold">Deny</button>
-                  <button onClick={() => respondAi(true)} className="flex-1 btn-cosmic !py-2.5 text-sm">Accept</button>
-                </div>
-              </div>
-            </div>
-          )}
-
-
 
           <div className="flex items-center justify-center p-4">
             <div className="grid gap-2 sm:gap-3 w-full max-w-[min(92vw,90vh)]" style={gridStyle(roomGrid.cols)}>
