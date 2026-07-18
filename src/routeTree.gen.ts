@@ -12,10 +12,14 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as VsBotRouteImport } from './routes/vs-bot'
 import { Route as VsAiRouteImport } from './routes/vs-ai'
 import { Route as RewardsRouteImport } from './routes/rewards'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as PremiumRouteImport } from './routes/premium'
 import { Route as OnlineMatchRouteImport } from './routes/online-match'
 import { Route as MultiplayerRouteImport } from './routes/multiplayer'
 import { Route as LevelsRouteImport } from './routes/levels'
+import { Route as HowToPlayRouteImport } from './routes/how-to-play'
+import { Route as ContactRouteImport } from './routes/contact'
+import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PlayLevelRouteImport } from './routes/play.$level'
 
@@ -32,6 +36,11 @@ const VsAiRoute = VsAiRouteImport.update({
 const RewardsRoute = RewardsRouteImport.update({
   id: '/rewards',
   path: '/rewards',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PremiumRoute = PremiumRouteImport.update({
@@ -54,6 +63,21 @@ const LevelsRoute = LevelsRouteImport.update({
   path: '/levels',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HowToPlayRoute = HowToPlayRouteImport.update({
+  id: '/how-to-play',
+  path: '/how-to-play',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContactRoute = ContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AboutRoute = AboutRouteImport.update({
+  id: '/about',
+  path: '/about',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -67,10 +91,14 @@ const PlayLevelRoute = PlayLevelRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
+  '/contact': typeof ContactRoute
+  '/how-to-play': typeof HowToPlayRoute
   '/levels': typeof LevelsRoute
   '/multiplayer': typeof MultiplayerRoute
   '/online-match': typeof OnlineMatchRoute
   '/premium': typeof PremiumRoute
+  '/privacy': typeof PrivacyRoute
   '/rewards': typeof RewardsRoute
   '/vs-ai': typeof VsAiRoute
   '/vs-bot': typeof VsBotRoute
@@ -78,10 +106,14 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
+  '/contact': typeof ContactRoute
+  '/how-to-play': typeof HowToPlayRoute
   '/levels': typeof LevelsRoute
   '/multiplayer': typeof MultiplayerRoute
   '/online-match': typeof OnlineMatchRoute
   '/premium': typeof PremiumRoute
+  '/privacy': typeof PrivacyRoute
   '/rewards': typeof RewardsRoute
   '/vs-ai': typeof VsAiRoute
   '/vs-bot': typeof VsBotRoute
@@ -90,10 +122,14 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
+  '/contact': typeof ContactRoute
+  '/how-to-play': typeof HowToPlayRoute
   '/levels': typeof LevelsRoute
   '/multiplayer': typeof MultiplayerRoute
   '/online-match': typeof OnlineMatchRoute
   '/premium': typeof PremiumRoute
+  '/privacy': typeof PrivacyRoute
   '/rewards': typeof RewardsRoute
   '/vs-ai': typeof VsAiRoute
   '/vs-bot': typeof VsBotRoute
@@ -103,10 +139,14 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/about'
+    | '/contact'
+    | '/how-to-play'
     | '/levels'
     | '/multiplayer'
     | '/online-match'
     | '/premium'
+    | '/privacy'
     | '/rewards'
     | '/vs-ai'
     | '/vs-bot'
@@ -114,10 +154,14 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/about'
+    | '/contact'
+    | '/how-to-play'
     | '/levels'
     | '/multiplayer'
     | '/online-match'
     | '/premium'
+    | '/privacy'
     | '/rewards'
     | '/vs-ai'
     | '/vs-bot'
@@ -125,10 +169,14 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/about'
+    | '/contact'
+    | '/how-to-play'
     | '/levels'
     | '/multiplayer'
     | '/online-match'
     | '/premium'
+    | '/privacy'
     | '/rewards'
     | '/vs-ai'
     | '/vs-bot'
@@ -137,10 +185,14 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AboutRoute: typeof AboutRoute
+  ContactRoute: typeof ContactRoute
+  HowToPlayRoute: typeof HowToPlayRoute
   LevelsRoute: typeof LevelsRoute
   MultiplayerRoute: typeof MultiplayerRoute
   OnlineMatchRoute: typeof OnlineMatchRoute
   PremiumRoute: typeof PremiumRoute
+  PrivacyRoute: typeof PrivacyRoute
   RewardsRoute: typeof RewardsRoute
   VsAiRoute: typeof VsAiRoute
   VsBotRoute: typeof VsBotRoute
@@ -168,6 +220,13 @@ declare module '@tanstack/react-router' {
       path: '/rewards'
       fullPath: '/rewards'
       preLoaderRoute: typeof RewardsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/premium': {
@@ -198,6 +257,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LevelsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/how-to-play': {
+      id: '/how-to-play'
+      path: '/how-to-play'
+      fullPath: '/how-to-play'
+      preLoaderRoute: typeof HowToPlayRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/about': {
+      id: '/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof AboutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -217,10 +297,14 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AboutRoute: AboutRoute,
+  ContactRoute: ContactRoute,
+  HowToPlayRoute: HowToPlayRoute,
   LevelsRoute: LevelsRoute,
   MultiplayerRoute: MultiplayerRoute,
   OnlineMatchRoute: OnlineMatchRoute,
   PremiumRoute: PremiumRoute,
+  PrivacyRoute: PrivacyRoute,
   RewardsRoute: RewardsRoute,
   VsAiRoute: VsAiRoute,
   VsBotRoute: VsBotRoute,
