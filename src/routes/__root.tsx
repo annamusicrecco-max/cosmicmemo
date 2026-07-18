@@ -103,13 +103,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;800&display=swap" },
     ],
-    scripts: [
-      {
-        async: true,
-        src: "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3777211176527473",
-        crossOrigin: "anonymous",
-      },
-    ],
+    scripts: [],
+
   }),
   shellComponent: RootShell,
   component: RootComponent,
@@ -136,6 +131,15 @@ function RootComponent() {
   useEffect(() => {
     registerPWA();
     try { startBackgroundMusic(loadState().muted); } catch { /* ignore */ }
+    // Inject AdSense client-side only to avoid SSR hydration mismatch
+    if (!document.querySelector('script[data-adsense]')) {
+      const s = document.createElement('script');
+      s.async = true;
+      s.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3777211176527473';
+      s.crossOrigin = 'anonymous';
+      s.setAttribute('data-adsense', 'true');
+      document.head.appendChild(s);
+    }
   }, []);
 
   return (
