@@ -118,19 +118,29 @@ function RootShell({ children }: { children: React.ReactNode }) {
     <html lang="en">
       <head>
         <HeadContent />
-        <script
-          async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3777211176527473"
-          crossOrigin="anonymous"
-        />
       </head>
-      <body>
+      <body suppressHydrationWarning>
         {children}
         <Scripts />
       </body>
     </html>
   );
 }
+
+function RootComponent() {
+  const { queryClient } = Route.useRouteContext();
+  useEffect(() => {
+    registerPWA();
+    try { startBackgroundMusic(loadState().muted); } catch { /* ignore */ }
+    if (!document.querySelector('script[data-adsense]')) {
+      const s = document.createElement('script');
+      s.async = true;
+      s.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3777211176527473';
+      s.crossOrigin = 'anonymous';
+      s.setAttribute('data-adsense', 'true');
+      document.head.appendChild(s);
+    }
+  }, []);
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
