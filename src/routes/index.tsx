@@ -118,8 +118,84 @@ function Welcome() {
         Start Journey
       </Link>
 
-      
+      {/* Written content for search engines & AdSense reviewers */}
+      <section className="relative z-10 mt-16 max-w-3xl text-left space-y-8 text-muted-foreground">
+        <div>
+          <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-3">What is Cosmic Memory?</h2>
+          <p className="text-base sm:text-lg leading-relaxed">
+            Cosmic Memory is a free browser-based memory card matching game set among the stars.
+            Flip pairs of glowing cosmic cards, remember their positions, and clear the board in
+            as few moves as possible. It's a modern take on the classic concentration game —
+            polished for touch, keyboard, and desktop play.
+          </p>
+        </div>
+
+        <div>
+          <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-3">How matching works</h2>
+          <p className="text-base sm:text-lg leading-relaxed">
+            Every level fills a grid with face-down cards arranged in matching pairs. Tap or click
+            a card to flip it, then flip a second card. If the two symbols match, they stay face-up
+            and count toward your score. If they don't, both cards flip back and you try again —
+            using what you've learned about their positions to plan smarter moves.
+          </p>
+        </div>
+
+        <div>
+          <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-3">100 levels of progression</h2>
+          <p className="text-base sm:text-lg leading-relaxed">
+            Cosmic Memory features 100 hand-tuned levels that gradually grow the grid, add more
+            pairs, and tighten the timer. Early levels ease you in with small boards; later
+            levels push short-term memory to its limits with large grids, faster countdowns, and
+            themed card backs. Each completed level is saved with your best completion time.
+          </p>
+        </div>
+
+        <div>
+          <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-3">Moves, timers and rewards</h2>
+          <p className="text-base sm:text-lg leading-relaxed">
+            Every level has a countdown timer shown as a shrinking bar at the top of the screen.
+            Match every pair before it empties to clear the level. Completing levels can grant
+            in-game rewards such as extra time, reveal peeks, level skippers, and cosmetic card
+            backs — all collected in your Rewards inventory.
+          </p>
+        </div>
+
+        <div>
+          <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-3">Play with friends or against AI</h2>
+          <p className="text-base sm:text-lg leading-relaxed">
+            Beyond solo play, Cosmic Memory includes local pass-and-play multiplayer, online
+            matchmaking with a shareable invite link, a bot opponent with short-term memory, and
+            a full AI opponent powered by a large language model that explains its moves.
+          </p>
+        </div>
+
+        <div>
+          <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-3">What makes it original</h2>
+          <p className="text-base sm:text-lg leading-relaxed">
+            Cosmic Memory blends a calming space aesthetic with a lo-fi soundtrack, real
+            progression, a working PWA install, and thoughtful multiplayer — all in a game that
+            runs entirely in your browser with no download required.
+          </p>
+        </div>
+      </section>
+
+      <SiteFooter />
     </main>
+  );
+}
+
+export function SiteFooter() {
+  return (
+    <footer className="relative z-10 mt-16 mb-6 text-sm text-muted-foreground border-t border-white/10 pt-6 w-full max-w-3xl">
+      <nav className="flex flex-wrap justify-center gap-x-6 gap-y-2">
+        <Link to="/levels" className="hover:text-foreground">Play</Link>
+        <Link to="/how-to-play" className="hover:text-foreground">How to Play</Link>
+        <Link to="/about" className="hover:text-foreground">About</Link>
+        <Link to="/privacy" className="hover:text-foreground">Privacy</Link>
+        <Link to="/contact" className="hover:text-foreground">Contact</Link>
+      </nav>
+      <p className="text-center mt-4 opacity-70">© {new Date().getFullYear()} Cosmic Memory. All rights reserved.</p>
+    </footer>
   );
 }
 
