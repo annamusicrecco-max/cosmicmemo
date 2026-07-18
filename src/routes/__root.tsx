@@ -88,6 +88,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "theme-color", content: "#0b0420" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
+      { name: "google-adsense-account", content: "ca-pub-3777211176527473" },
       { name: "twitter:title", content: "Lovable App" },
       { name: "twitter:description", content: "Cosmic Rewards Journey is a 100-level memory card game where players earn real-world rewards." },
       { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/da6b5deb-f391-4559-af32-e9450899da8d/id-preview-6723887a--9e0820a0-17a9-48a9-abde-d0843dcc6e35.lovable.app-1778979918263.png" },
@@ -117,13 +118,8 @@ function RootShell({ children }: { children: React.ReactNode }) {
     <html lang="en">
       <head>
         <HeadContent />
-        <script
-          async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3777211176527473"
-          crossOrigin="anonymous"
-        />
       </head>
-      <body>
+      <body suppressHydrationWarning>
         {children}
         <Scripts />
       </body>
@@ -136,7 +132,16 @@ function RootComponent() {
   useEffect(() => {
     registerPWA();
     try { startBackgroundMusic(loadState().muted); } catch { /* ignore */ }
+    if (!document.querySelector('script[data-adsense]')) {
+      const s = document.createElement('script');
+      s.async = true;
+      s.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3777211176527473';
+      s.crossOrigin = 'anonymous';
+      s.setAttribute('data-adsense', 'true');
+      document.head.appendChild(s);
+    }
   }, []);
+
 
   return (
     <QueryClientProvider client={queryClient}>
